@@ -13,7 +13,7 @@ import unittest
 # os.chdir(projectRoot)
 
 # from AMBDevice.Tests.Unit.AMBConnection import test_AMBConnection
-from Tests.Unit.AMBDevice import test_AMBDevice
+from Tests.Unit.AMBDeviceDLL import test_AMBDeviceDLL
         
 if __name__ == "__main__":
     unittest.main() # run all tests

@@ -1,12 +1,12 @@
 '''
 AMBDevice represents the lowest-level CAN bus device.
-  Uses the AMBConnection.
+  Uses the AMBConnectionNican.
   It has a node address and, for SocketServer devices, a copy of the ABM index and channel
   The Monitor.vi and Control.vi methods take care of combining the node address with the provided RCA.
   Implements standard AMBSI monitor points.
 '''
 
-from .AMBConnection import AMBConnection
+from AMB import AMBConnectionItf
 from typing import Optional
 
 class AMBDevice():
@@ -18,13 +18,12 @@ class AMBDevice():
     GET_AMBSI_SOFTWARE_REV  = 0X30004
     
     def __init__(self, 
-                 conn:AMBConnection,
+                 conn:AMBConnectionItf,
                  nodeAddr:int):
         '''
-        :param conn: AMBConnection to use
+        :param conn: AMBConnectionNican to use
         :param nodeAddr: of device on the bus
         '''
-        self.shutdown()
         self.conn = conn
         self.nodeAddr = nodeAddr
 

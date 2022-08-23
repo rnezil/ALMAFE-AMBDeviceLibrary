@@ -1,21 +1,21 @@
 import unittest
 
-from AMB.AMBConnectionNican import AMBConnectionNican
+from AMB.AMBConnectionDLL import AMBConnectionDLL
 from AMB.AMBDevice import AMBDevice
 
-class test_AMBDevice(unittest.TestCase):
+class test_AMBDeviceDLL(unittest.TestCase):
     SET_FE_MODE             = 0x2100E
     GET_AMBSI_PROTOCOL_REV  = 0x30000
+    conn = None
     
     def setUp(self):
-        self.conn = AMBConnectionNican(channel = 0, resetOnError = True)
+        if not self.conn:
+            self.conn = AMBConnectionDLL(channel = 0)
         self.dev = AMBDevice(self.conn, nodeAddr = 0x13)
         
     def tearDown(self):
         self.dev.shutdown()
-        self.conn.shutdown()
         self.dev = None
-        self.conn = None
         
     def test_command(self):
         # this assumes that the device is an FEMC module.   The AMBSI alone has no commands we can test.

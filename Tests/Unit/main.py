@@ -12,8 +12,10 @@ import unittest
 # # and change to that directory:
 # os.chdir(projectRoot)
 
-# from AMBDevice.Tests.Unit.AMBConnection import test_AMBConnection
-from Tests.Unit.AMBDeviceDLL import test_AMBDeviceDLL
-        
+# from Tests.Unit.AMBConnectionNican import test_AMBConnectionNican
+# from Tests.Unit.AMBConnectionDLL import test_AMBConnectionDLL
+# from Tests.Unit.AMBDevice import test_AMBDeviceNican, test_AMBDeviceDLL
+from Tests.Unit.FEMCDevice import test_FEMCDevice
+
 if __name__ == "__main__":
     unittest.main() # run all tests

@@ -6,31 +6,46 @@ AMBConnection represents a connection to a CAN bus.
   Implements bare CAN bus monitor, control, and node search.
 '''
 from typing import Optional
-from .AMBConnectionItf import AmbConnectionItf
+from .AMBConnectionItf import AMBConnectionItf, BusNode
 import can
+from datetime import datetime
 from can.interfaces.nican import NicanError
 
-class AMBConnectionNican(AmbConnectionItf):
+class AMBConnectionNican(AMBConnectionItf):
     
     ARBITRATION_ID = 0x20000000
-    SEND_TIMEOUT = 0.002
-    RCV_TIMEOUT = 0.002
+    SEND_TIMEOUT = 0.2
+    RCV_TIMEOUT = 0.2
     
-    def __init__(self, channel:Optional[int] = 0, resetOnError = False):
+    def __init__(self, channel:Optional[int] = 0, resetOnError = False, logInfo = True):
         '''
         Constructor opens a connection using a local NI-CAN interface
                 
         :param channel: typically 0..5 corresponding to CAN0..CAN5 or can be the channel number on the ABM  
-        :param resetOnError: if true, and we get an 'already configured' error, try forcing a reset.
+        :param resetOnError: if True, and we get an 'already configured' error, try forcing a reset.
+        :param logInfo: if True, print diagnostic messages to the console
         '''
         self.channel = channel
+        self.logInfo = logInfo
         self.bus = None
+        self.receiveTimeout = self.RCV_TIMEOUT
         try:
             self.bus = can.ThreadSafeBus(interface = 'nican', channel = 'CAN{}'.format(channel), bitrate = 1000000)
         except (NicanError) as err:
+            self.__logMessage(repr(err))
             if err.error_code == 0xBFF62007 and resetOnError:
-                self.bus.reset()
-                self.bus = can.ThreadSafeBus(interface = 'nican', channel = 'CAN{}'.format(channel), bitrate = 1000000)
+                self.__logMessage("resetting bus and trying again...")
+                try:
+                    self.bus.reset()
+                    self.bus = can.ThreadSafeBus(interface = 'nican', channel = f"CAN{channel}", bitrate = 1000000)
+                except:
+                    self.bus = None
+            else:
+                self.bus = None
+        if not self.bus and self.logInfo:            
+            self.__logMessage("NO CONNECTION.", True)
+        else:
+            self.__logMessage('connect.')
         
     def shutdown(self):
         '''
@@ -38,64 +53,78 @@ class AMBConnectionNican(AmbConnectionItf):
         '''
         if self.bus:
             self.bus.shutdown()
+            self.__logMessage("shutdown.")
         self.channel = None
         self.bus = None
-        
+
+    def setTimeout(self, timeoutMs):
+        '''
+        Override the default monitor timeout
+        :param timeoutMs: milliseconds
+        '''
+        self.receiveTimeout = timeoutMs / 1000.0
+                
     def findNodes(self):
         '''
         Send a broadcast request to get all CAN nodes on the bus
-        :return list of int node ids found
+        :return list of AMBConnectionItf.BusNode
         '''
+        if not self.bus:
+            return []
         msg = can.Message(arbitration_id=self.ARBITRATION_ID, is_extended_id=True, data=[])
         self.bus.send(msg, timeout=self.SEND_TIMEOUT)
+        self.__logMessage("findNodes...")
         nodes = []
         while True:
-            msg = self.bus.recv(timeout=self.RCV_TIMEOUT)
+            msg = self.bus.recv(timeout=self.receiveTimeout)
             if msg is not None:
-                nodeAddr = (msg.arbitration_id - self.ARBITRATION_ID) / 0x40000 - 1
-                print(f"{nodeAddr:X}: {msg.data}")
-                nodes.apppend((nodeAddr, msg.data))
+                address = (msg.arbitration_id >> 18) - 1
+                nodes.append(BusNode(address = address, serialNum = bytes(msg.data)))
+                self.__logMessage(f"{address:X}: {msg.data.hex().upper()}")
             else:
                 break
         return nodes
 
-    def command(self, nodeAddr:int, rca:int, data:bytearray):
+    def command(self, nodeAddr:int, rca:int, data:bytes):
         '''
-        Send a command. No response is expected
+        Send a command. No response is expected.
         :param nodeAddr destination node for the command
-        :param rca: relative CAN address
-        :param data: bytearray of 1-8 bytes command payload
+        :param RCA: relative CAN address
+        :param data: 1-8 byte command payload
         :return bool success
         '''
+        if not self.bus:
+            return False
         msg = can.Message(arbitration_id=self.rcaToArbId(nodeAddr, rca), is_extended_id=True, data=data)
         self.bus.send(msg, timeout=self.SEND_TIMEOUT)
         return True
         
-    def monitor(self, nodeAddr:int, rca:int, timeout:Optional[float] = None):
+    def monitor(self, nodeAddr:int, rca:int):
         '''
-        Send a monitor request and wait for the response
+        Send a monitor request and wait for the response.
         :param nodeAddr: destination node for the request
-        :param rca: relative CAN address
-        :param timeout: if provided, override the default RCV_TIMEOUT
-        :return bytearray of 1-8 bytes response payload or None if error
+        :param RCA: relative CAN address
+        :return data:bytes: 1-8 byte response payload or none
         ''' 
+        if not self.bus:
+            return None
         # clear the read buffer of any stale replies
         while True:
-            msg = self.bus.recv(timeout=self.RCV_TIMEOUT)
+            msg = self.bus.recv(timeout=self.receiveTimeout)
             if msg is None:
                 break
         msg = can.Message(arbitration_id=self.rcaToArbId(nodeAddr, rca), is_extended_id=True, data=b'')
-        self.bus.send(msg, timeout=self.SEND_TIMEOUT)
-        msg = self.bus.recv(timeout=self.RCV_TIMEOUT)
+        self.bus.send(msg, timeout = self.SEND_TIMEOUT)
+        msg = self.bus.recv(timeout = self.receiveTimeout)
         if msg is not None:
-            return msg.data
+            return bytes(msg.data)
         else:
+            self.__logMessage(f"monitor failed:{nodeAddr:X}:{rca:X}")
             return None
         
     def rcaToArbId(self, nodeAddr, rca):
-        return 0x40000 * (nodeAddr + 1) + self.ARBITRATION_ID + rca
+        return ((nodeAddr + 1) << 18) + rca
     
-    def arbIdToNodeRCA(self, arbId):
-        nodeAddr = (arbId - self.ARBITRATION_ID) / 0x40000 - 1
-        rca = arbId - self.ARBITRATION_ID - (0x4000 * (nodeAddr + 1))
-        return nodeAddr, rca
+    def __logMessage(self, msg, alwaysLog = False):
+        if self.logInfo or alwaysLog:
+            print(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " AMBConnectionNican: " + msg)

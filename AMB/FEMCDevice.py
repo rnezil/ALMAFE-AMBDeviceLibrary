@@ -36,29 +36,11 @@ class FEMCDevice(AMBDevice):
     MODE_MAINTENANCE       = 2
     MODE_SIMULATE          = 3
     
-    GET_AMBSI_VERSION_INFO  = 0x20000   # get the version info for the AMBSI firmware
-    GET_SETUP_INFO          = 0x20001   # Initialize communications between the AMBSI and ARCOM
-    GET_VERSION_INFO        = 0x20002   # Get the version info for the ARCOM Pegasus firmware
-    GET_PPCOMM_TIME         = 0x20007   # For debugging:  get 8 bytes response as fast as possible
-    GET_FPGA_VERSION_INFO   = 0x20008   # Get the version info for the FEMC FPGA
-    GET_ESNS_FOUND          = 0x2000A   # Get the number of ESNs found in the FE
-    GET_ESNS                = 0x2000B   # Get the next ESN from the FE queue
-    GET_ERRORS_NUMBER       = 0x2000C   # Get the number of errors in the error queue
-    GET_NEXT_ERROR          = 0x2000D   # Get the next error from the error queue
-    GET_FE_MODE             = 0x2000E   # Get the FE operating mode (operational, troubleshooting, maintenance)
-
-    # SPECIAL control points:      
-    SET_EXIT_PROGRAM        = 0x21000   # For debugging.
-    SET_REBOOT              = 0x21001   # For debugging.
-    SET_FE_MODE             = 0x2100E   # Set the FE operating mode.
-    SET_READ_ESN            = 0x2100F   # Tell the FEMC module to rescan the 1wire bus for ESNs.
-    
-    # power distribution module:
-    SET_CART_POWER          = 0x1A00C
-    GET_CART_POWER          = 0x0A00C
-    GET_NUM_BANDS_POWERED   = 0x0A0A0
-    
-    def __init__(self, conn:AMBConnectionItf, nodeAddr:int, femcPort:Optional[int] = PORT_FEMC_MODULE, logInfo = True):
+    def __init__(self, 
+                 conn:AMBConnectionItf, 
+                 nodeAddr:int, 
+                 femcPort:Optional[int] = PORT_FEMC_MODULE, 
+                 logInfo = True):
         super(FEMCDevice, self).__init__(conn, nodeAddr)
         self.femcPort = femcPort
         self.logInfo = logInfo
@@ -116,7 +98,7 @@ class FEMCDevice(AMBDevice):
         if not data:
             return None
         ret = []
-        for _ in range(data[0] + 1):
+        for _ in range(data[0]):
             data = self.__devMonitor(self.GET_ESNS)
             if data:
                 ret.append(data)
@@ -127,7 +109,7 @@ class FEMCDevice(AMBDevice):
         ret = ""
         if data:
             for esn in data:
-                ret += f"{esn[0]:02X} {esn[1]:02X} {esn[2]:02X} {esn[3]:02X} {esn[0]:02X} {esn[0]:02X} {esn[0]:02X} {esn[0]:02X}\n"
+                ret += f"{esn[0]:02X} {esn[1]:02X} {esn[2]:02X} {esn[3]:02X} {esn[4]:02X} {esn[5]:02X} {esn[6]:02X} {esn[7]:02X}\n"
         return ret
             
     def setBandPower(self, band:int, enable:bool = True):
@@ -142,8 +124,6 @@ class FEMCDevice(AMBDevice):
     def setAllBandsOff(self):
         for band in range(10):
             self.setBandPower(band + 1, False)
-            sleep(0.2)
-            
 
     def getNumBandsPowered(self):
         data = self.__devMonitor(self.GET_NUM_BANDS_POWERED)
@@ -257,3 +237,24 @@ class FEMCDevice(AMBDevice):
     def __logMessage(self, msg, alwaysLog = False):
         if self.logInfo or alwaysLog:
             print(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " FEMCDevice: " + msg)
+
+    # RCAs used internally
+    GET_AMBSI_VERSION_INFO  = 0x20000   # get the version info for the AMBSI firmware
+    GET_SETUP_INFO          = 0x20001   # Initialize communications between the AMBSI and ARCOM
+    GET_VERSION_INFO        = 0x20002   # Get the version info for the ARCOM Pegasus firmware
+    GET_PPCOMM_TIME         = 0x20007   # For debugging:  get 8 bytes response as fast as possible
+    GET_FPGA_VERSION_INFO   = 0x20008   # Get the version info for the FEMC FPGA
+    GET_ESNS_FOUND          = 0x2000A   # Get the number of ESNs found in the FE
+    GET_ESNS                = 0x2000B   # Get the next ESN from the FE queue
+    GET_ERRORS_NUMBER       = 0x2000C   # Get the number of errors in the error queue
+    GET_NEXT_ERROR          = 0x2000D   # Get the next error from the error queue
+    GET_FE_MODE             = 0x2000E   # Get the FE operating mode (operational, troubleshooting, maintenance)
+
+    # SPECIAL control points:      
+    SET_FE_MODE             = 0x2100E   # Set the FE operating mode.
+    SET_READ_ESN            = 0x2100F   # Tell the FEMC module to rescan the 1wire bus for ESNs.
+    
+    # power distribution module:
+    SET_CART_POWER          = 0x1A00C
+    GET_CART_POWER          = 0x0A00C
+    GET_NUM_BANDS_POWERED   = 0x0A0A0

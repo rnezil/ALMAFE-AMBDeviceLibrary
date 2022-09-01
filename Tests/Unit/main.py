@@ -15,7 +15,8 @@ import unittest
 # from Tests.Unit.AMBConnectionNican import test_AMBConnectionNican
 # from Tests.Unit.AMBConnectionDLL import test_AMBConnectionDLL
 # from Tests.Unit.AMBDevice import test_AMBDeviceNican, test_AMBDeviceDLL
-from Tests.Unit.FEMCDevice import test_FEMCDevice
+# from Tests.Unit.FEMCDevice import test_FEMCDevice
+from Tests.Unit.LODevice import test_LODevice
 
 if __name__ == "__main__":
     unittest.main() # run all tests

@@ -20,8 +20,7 @@ class AMBConnectionNican(AMBConnectionItf):
     def __init__(self, channel:Optional[int] = 0, resetOnError = False, logInfo = True):
         '''
         Constructor opens a connection using a local NI-CAN interface
-                
-        :param channel: typically 0..5 corresponding to CAN0..CAN5 or can be the channel number on the ABM  
+        :param channel: typically 0..5 corresponding to CAN0..CAN5  
         :param resetOnError: if True, and we get an 'already configured' error, try forcing a reset.
         :param logInfo: if True, print diagnostic messages to the console
         '''

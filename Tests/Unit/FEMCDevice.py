@@ -26,8 +26,6 @@ class test_FEMCDevice(unittest.TestCase):
     def setUp(self):
         self.dev = FEMCDevice(self.conn, 0x13)
         self.dev.initSession(FEMCDevice.MODE_SIMULATE)
-        # self.dev.setAllBandsOff()
-        sleep(0.5)
         
     def tearDown(self):
         self.dev.shutdown()
@@ -66,19 +64,19 @@ class test_FEMCDevice(unittest.TestCase):
     def test_setBandPower(self):
         self.dev.setAllBandsOff()
         self.dev.setBandPower(FEMCDevice.PORT_BAND7, True)
-        sleep(0.5)
+        sleep(0.2)
         self.assertTrue(self.dev.getNumBandsPowered() == 1)
         self.dev.setBandPower(FEMCDevice.PORT_BAND6, True)
-        sleep(0.5)
+        sleep(0.2)
         self.assertTrue(self.dev.getNumBandsPowered() == 2)
         self.dev.setBandPower(FEMCDevice.PORT_BAND7, False)
         self.dev.setBandPower(FEMCDevice.PORT_BAND6, False)
-        sleep(0.5)
+        sleep(0.2)
         self.assertTrue(self.dev.getNumBandsPowered() == 0)
         
     def test_monitor(self):
         self.dev.setBandPower(FEMCDevice.PORT_BAND6, True)
-        sleep(0.5)
+        sleep(0.2)
         self.dev.setPort(FEMCDevice.PORT_BAND6)
         data = self.dev.monitor(self.GET_YTO_COARSE_TUNE)
         tune = self.dev.unpackU16(data)
@@ -94,7 +92,7 @@ class test_FEMCDevice(unittest.TestCase):
                         
     def test_command(self):
         self.dev.setBandPower(FEMCDevice.PORT_BAND6, True)
-        sleep(0.5)
+        sleep(0.2)
         self.dev.setPort(FEMCDevice.PORT_BAND6)
         self.assertTrue(self.dev.command(self.SET_PHOTOMIXER_ENABLE, FEMCDevice.packBool(False)))
         enable = self.dev.unpackBool(self.dev.monitor(self.GET_PHOTOMIXER_ENABLE))

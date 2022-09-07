@@ -12,11 +12,12 @@ import unittest
 # # and change to that directory:
 # os.chdir(projectRoot)
 
-# from Tests.Unit.AMBConnectionNican import test_AMBConnectionNican
-# from Tests.Unit.AMBConnectionDLL import test_AMBConnectionDLL
-# from Tests.Unit.AMBDevice import test_AMBDeviceNican, test_AMBDeviceDLL
-# from Tests.Unit.FEMCDevice import test_FEMCDevice
-# from Tests.Unit.LODevice import test_LODevice
+from Tests.Unit.AMBConnectionNican import test_AMBConnectionNican
+from Tests.Unit.AMBConnectionDLL import test_AMBConnectionDLL
+from Tests.Unit.AMBDevice import test_AMBDeviceNican
+from Tests.Unit.AMBDevice import test_AMBDeviceDLL
+from Tests.Unit.FEMCDevice import test_FEMCDevice
+from Tests.Unit.LODevice import test_LODevice
 from Tests.Unit.CCADevice import test_CCADevice
 
 if __name__ == "__main__":

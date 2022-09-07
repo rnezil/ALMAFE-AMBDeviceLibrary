@@ -24,7 +24,10 @@ class AMBConnectionDLL(AMBConnectionItf):
         if ret != 0:
             self.__logMessage("dll.initialize failed.", True)
             self.shutdown()
-                    
+              
+    def __del__(self):
+        self.shutdown()
+          
     def shutdown(self):
         '''
         Close connection
@@ -32,7 +35,6 @@ class AMBConnectionDLL(AMBConnectionItf):
         if self.dll:
             self.dll.shutdown()
             DLLClose.dlclose(self.dll._handle)
-            self.__logMessage("shutdown.")
         self.channel = None
         self.dll = None
     

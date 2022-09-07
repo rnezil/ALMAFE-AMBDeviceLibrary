@@ -44,23 +44,33 @@ class FEMCDevice(AMBDevice):
         super(FEMCDevice, self).__init__(conn, nodeAddr)
         self.femcPort = femcPort
         self.logInfo = logInfo
+        self.initialized = False
+    
+    def __del__(self):
+        self.shutdown() 
         
     def initSession(self, mode:Optional[int] = MODE_TROUBLESHOOTING):
-        data = self.__devMonitor(self.GET_SETUP_INFO)
-        if data is None:
-            self.__logMessage('GET_SETUP_INFO no data', True)
-        elif data == b'\x00' or data == b'\x05':
-            if self.setFeMode(mode):
-                return True
-        return False
+        if self.initialized:
+            self.self.setFeMode(mode)
+            return True
+        else:
+            data = self.__devMonitor(self.GET_SETUP_INFO)
+            if data is None:
+                self.__logMessage('GET_SETUP_INFO no data', True)
+            elif data == b'\x00' or data == b'\x05':
+                self.initialized = True
+                if self.setFeMode(mode):
+                    return True
+            return False
 
     def setPort(self, femcPort:int):
         if femcPort >= self.PORT_FEMC_MODULE and femcPort <= self.PORT_FETIM:
             self.femcPort = femcPort
     
     def shutdown(self):
-        super(FEMCDevice, self).shutdown()
         self.femcPort = None
+        self.initialized = False
+        super(FEMCDevice, self).shutdown()
        
     def getFemcVersion(self):
         data = self.__devMonitor(self.GET_VERSION_INFO)

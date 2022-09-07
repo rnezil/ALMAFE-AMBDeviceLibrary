@@ -148,8 +148,8 @@ class test_LODevice(unittest.TestCase):
         yto = self.dev.getYTO()
         self.__checkAll(yto)
         self.assertTrue(yto['courseTune'] == 987)
-        self.assertTrue(yto['lowGhz'] == 12.0)
-        self.assertTrue(yto['highGhz'] == 15.5)
+        self.assertTrue(yto['lowGHz'] == 12.0)
+        self.assertTrue(yto['highGHz'] == 15.5)
         self.assertTrue(yto['stepSize'] == 3.5 / 4095)
         print("YTO: ", yto)
         

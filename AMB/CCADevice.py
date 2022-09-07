@@ -35,9 +35,9 @@ class CCADevice(FEMCDevice):
         
         ret = True
         if Vj is not None:
-            ret = self.command(self.CMD_OFFSET + self.SIS_VOLTAGE + subsysOffset, self.packFloat(Vj))
-        if Imag is not None and ret:
-            ret = self.command(self.CMD_OFFSET + self.SIS_MAGNET_CURRENT + subsysOffset, self.packFloat(Imag))
+            ret &= self.command(self.CMD_OFFSET + self.SIS_VOLTAGE + subsysOffset, self.packFloat(Vj))
+        if Imag is not None:
+            ret &= self.command(self.CMD_OFFSET + self.SIS_MAGNET_CURRENT + subsysOffset, self.packFloat(Imag))
         return ret
 
     def setSISOpenLoop(self, openLoop:bool = False):
@@ -61,8 +61,8 @@ class CCADevice(FEMCDevice):
         '''
         pol = int(pol)
         lna = int(lna)
-        bothPols = (pol == -1)
-        bothLNAs = (lna == -1) 
+        bothPols = (pol <= -1)
+        bothLNAs = (lna <= -1) 
         pol, lna = self.__checkPolAndDevice(pol, lna)
         commandData = self.packBool(enable)
         if pol == 0 or bothPols:
@@ -99,7 +99,7 @@ class CCADevice(FEMCDevice):
         if VD1 is not None:
             self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset, self.packFloat(VD1))
         if VD2 is not None:
-            self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset, self.packFloat(VD3))
+            self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset, self.packFloat(VD2))
         if VD3 is not None:
             self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset, self.packFloat(VD3))
         if ID1 is not None:
@@ -125,9 +125,13 @@ class CCADevice(FEMCDevice):
                 self.command(self.CMD_OFFSET + self.LNA_DRAIN_CURRENT + subsysOffset, self.packFloat(ID6))
         return True
         
-    def setLNALEDEnable(self, enable:bool):
-        return self.command(self.CMD_OFFSET + self.LNA_LED_ENABLE, self.packBool(enable))
+    def setLNALEDEnable(self, pol:int, enable:bool):
+        pol, sis = self.__checkPolAndDevice(pol, 1)
+        return self.command(self.CMD_OFFSET + self.LNA_LED_ENABLE + pol * self.POL1_OFFSET, self.packBool(enable))
         
+    def getLNALEDEnable(self, pol:int):
+        return self.unpackBool(self.monitor(self.LNA_LED_ENABLE + pol * self.POL1_OFFSET))
+
     def getCartridgeTemps(self):
         '''
         Read the cartridge temperature sensors:
@@ -135,7 +139,7 @@ class CCADevice(FEMCDevice):
         '''
         ret = {}
         for i in range(6):
-            ret[f"temp{i}"] = self.unpackFloat(self.monitor(self.CARTRIDGE_TEMP + (i * self.CARTRIDGE_TEMP_OFFSET)))
+            ret[f"temp{i}"] = round(self.unpackFloat(self.monitor(self.CARTRIDGE_TEMP + (i * self.CARTRIDGE_TEMP_OFFSET))), 4)
         return ret
     
     def getSIS(self, pol:int, sis:int, averaging:int = 1):
@@ -162,10 +166,10 @@ class CCADevice(FEMCDevice):
             sumIj += self.unpackFloat(self.monitor(self.SIS_CURRENT + subsysOffset))
         ret = {}
         
-        ret['Vj'] = sumVj / averaging  
-        ret['Ij'] = sumIj / averaging 
-        ret['Vmag'] = self.unpackFloat(self.monitor(self.SIS_MAGNET_VOLTAGE + subsysOffset))
-        ret['Imag'] = self.unpackFloat(self.monitor(self.SIS_MAGNET_CURRENT + subsysOffset))
+        ret['Vj'] = round(sumVj / averaging, 4)  
+        ret['Ij'] = round(sumIj / averaging, 4) 
+        ret['Vmag'] = round(self.unpackFloat(self.monitor(self.SIS_MAGNET_VOLTAGE + subsysOffset)), 4)
+        ret['Imag'] = round(self.unpackFloat(self.monitor(self.SIS_MAGNET_CURRENT + subsysOffset)), 4)
         ret['averaging'] = averaging
         return ret
     
@@ -194,22 +198,22 @@ class CCADevice(FEMCDevice):
         ret['enable'] = self.unpackBool(self.monitor(self.LNA_ENABLE + subsysOffset))
         for stage in range(3):
             stageOffset = stage * self.LNA_STAGE_OFFSET
-            ret[f"VD{stage + 1}"] = self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + stageOffset))
-            ret[f"ID{stage + 1}"] = self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + stageOffset))
-            ret[f"VG{stage + 1}"] = self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + stageOffset))
+            ret[f"VD{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + stageOffset)), 4)
+            ret[f"ID{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + stageOffset)), 4)
+            ret[f"VG{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + stageOffset)), 4)
             if self.band in (1, 2):
                 # for bands 1 and 2 we return VD4...VD6 etc. by mapping to stages 1-3 of sb2
-                ret[f"VD{stage + 4}"] = self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset))
-                ret[f"ID{stage + 4}"] = self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + self.DEVICE2_OFFSET + stageOffset))
-                ret[f"VG{stage + 4}"] = self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset))
+                ret[f"VD{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
+                ret[f"ID{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
+                ret[f"VG{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
         return ret
             
-    def getHeaterCurrent(self):
+    def getSISHeaterCurrent(self):
         '''
         Get the SIS heater current 
-        :return float mA
+        :return float
         '''
-        return self.unpackFloat(self.monitor(self.SIS_HEATER_CURRENT))
+        return round(self.unpackFloat(self.monitor(self.SIS_HEATER_CURRENT)), 4)
     
     def __checkPolAndDevice(self, pol:int, device:int):
         '''
@@ -253,5 +257,5 @@ class CCADevice(FEMCDevice):
     LNA_DRAIN_CURRENT       = 0x0041
     LNA_GATE_VOLTAGE        = 0x0042
     LNA_LED_ENABLE          = 0x0100
-    SIS_HEATER_ENABLE       = 0x0180
+    SIS_HEATER_ENABLE       = 0x0180    # command only
     SIS_HEATER_CURRENT      = 0x01C0

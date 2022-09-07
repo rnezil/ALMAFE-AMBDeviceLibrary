@@ -87,13 +87,13 @@ class test_LODevice(unittest.TestCase):
     def test_selectLockSideband(self):
         self.dev.selectLockSideband(LODevice.LOCK_BELOW_REF)
         pll = self.dev.getPLLConfig()
-        self.assertTrue(pll['loopBW'] == LODevice.LOCK_BELOW_REF, "Lock below ref")
+        self.assertTrue(pll['lockSB'] == LODevice.LOCK_BELOW_REF, "Lock below ref")
         self.dev.selectLockSideband(LODevice.LOCK_ABOVE_REF)
         pll = self.dev.getPLLConfig()
-        self.assertTrue(pll['loopBW'] == LODevice.LOCK_ABOVE_REF, "Lock above ref")
+        self.assertTrue(pll['lockSB'] == LODevice.LOCK_ABOVE_REF, "Lock above ref")
         self.dev.selectLockSideband(LODevice.LOCK_BELOW_REF)
         pll = self.dev.getPLLConfig()
-        self.assertTrue(pll['loopBW'] == LODevice.LOCK_BELOW_REF, "Lock below ref")
+        self.assertTrue(pll['lockSB'] == LODevice.LOCK_BELOW_REF, "Lock below ref")
     
     def test_setNullLoopIntegrator(self):
         self.dev.setNullLoopIntegrator(False)
@@ -110,15 +110,15 @@ class test_LODevice(unittest.TestCase):
         self.dev.setPABias(pol=0, drainControl=0, gateVoltage=0)
         self.dev.setPABias(pol=1, drainControl=0, gateVoltage=0)
         pa = self.dev.getPA()
-        self.assertAlmostEqual(pa['VDp0'], 0, delta=0.1)
-        self.assertAlmostEqual(pa['VDp1'], 0, delta=0.1)
-        self.assertAlmostEqual(pa['VGp0'], 0, delta=0.1)
-        self.assertAlmostEqual(pa['VGp1'], 0, delta=0.1)
+        self.assertAlmostEqual(pa['VDp0'], 0, delta=0.1, msg="This is expected to fail in FEMode=3 simulation mode")
+        self.assertAlmostEqual(pa['VDp1'], 0, delta=0.1, msg="This is expected to fail in FEMode=3 simulation mode")
+        self.assertAlmostEqual(pa['VGp0'], 0, delta=0.1, msg="This is expected to fail in FEMode=3 simulation mode")
+        self.assertAlmostEqual(pa['VGp1'], 0, delta=0.1, msg="This is expected to fail in FEMode=3 simulation mode")
         self.dev.setPABias(pol=0, gateVoltage=-0.2)
         self.dev.setPABias(pol=1, gateVoltage=-0.2)
         pa = self.dev.getPA()
-        self.assertAlmostEqual(pa['VGp0'], -0.2, delta=0.1)
-        self.assertAlmostEqual(pa['VGp1'], -0.2, delta=0.1)
+        self.assertAlmostEqual(pa['VGp0'], -0.2, delta=0.1, msg="This is expected to fail in FEMode=3 simulation mode")
+        self.assertAlmostEqual(pa['VGp1'], -0.2, delta=0.1, msg="This is expected to fail in FEMode=3 simulation mode")
         self.dev.setPABias(pol=0, drainControl=1)
         self.dev.setPABias(pol=1, drainControl=1)
         pa = self.dev.getPA()
@@ -139,6 +139,7 @@ class test_LODevice(unittest.TestCase):
         self.assertEqual(tdpa['collectorP0'], 250)
         self.assertEqual(tdpa['collectorP1'], 250)
         self.dev.setTeledynePAConfig(hasTeledyne = False)
+        tdpa = self.dev.getTeledynePA()
         self.assertFalse(tdpa['hasTeledyne'])
         
     def test_getYTO(self):
@@ -150,7 +151,7 @@ class test_LODevice(unittest.TestCase):
         self.assertTrue(yto['lowGhz'] == 12.0)
         self.assertTrue(yto['highGhz'] == 15.5)
         self.assertTrue(yto['stepSize'] == 3.5 / 4095)
-        print("YTO state: ", yto)
+        print("YTO: ", yto)
         
     def test_getPLL(self):
         self.dev.setYTOLimits(13.5, 16.5)
@@ -158,24 +159,28 @@ class test_LODevice(unittest.TestCase):
         pll = self.dev.getPLL()
         self.__checkAll(pll)
         self.assertTrue(pll['courseTune'] == 1234)
-        print("PLL state: ", pll)
+        print("PLL: ", pll)
 
     def test_getPhotomixer(self):
         pmx = self.dev.getPhotomixer()
         self.__checkAll(pmx)
-        print("Photomixer state: ", pmx)
+        print("Photomixer: ", pmx)
         
     def test_getAMC(self):
         amc = self.dev.getAMC()
         self.__checkAll(amc)
-        print("AMC state: ", amc)
+        print("AMC: ", amc)
         
     def test_getPA(self):
         pa = self.dev.getPA()
         self.__checkAll(pa)
-        print("PA state: ", pa)
+        print("PA: ", pa)
 
-    def __checkAll(self, state):
+    def __checkAll(self, state:dict):
+        '''
+        Assert that all dictionary items do not have a value of None
+        :param state:
+        '''
         self.assertIsNotNone(state, "State dict is None")
         for val in state.values():
             with self.subTest(val = val):

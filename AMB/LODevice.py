@@ -305,7 +305,7 @@ class LODevice(FEMCDevice):
         return self.command(self.CMD_OFFSET + self.PLL_LOCK_SIDEBAND_SELECT, self.packU8(select))
     
     def setNullLoopIntegrator(self, select:bool):
-        return self.command(self.CMD_OFFSET + self.PLL_LOCK_SIDEBAND_SELECT, self.packBool(select))
+        return self.command(self.CMD_OFFSET + self.PLL_NULL_LOOP_INTEGRATOR, self.packBool(select))
 
     def setPABias(self, pol:int, drainControl:float = None, gateVoltage:float = None):
         if pol < 0 or pol > 1:
@@ -342,8 +342,8 @@ class LODevice(FEMCDevice):
 
     def getYTO(self):
         '''
-        Get the YIG oscillator monitor data:
-        { 'courseTune': int, 'lowGhz': float, 'highGhz': float, 'stepSize': float }
+        Read the YIG oscillator monitor data and configuration:
+        :return { 'courseTune': int, 'lowGhz': float, 'highGhz': float, 'stepSize': float }
         '''
         ret = {}
         ret['courseTune'] = self.unpackU16(self.monitor(self.YTO_COARSE_TUNE))
@@ -354,8 +354,9 @@ class LODevice(FEMCDevice):
 
     def getPLL(self):
         '''
-        Get all PLL monitor data:
-        { 'courseTune': int, 'corrV': float, 'temperature': float, 'nullPLL': bool } plus everything from getLockInfo()
+        Read all PLL monitor data:
+        :return { 'courseTune': int, 'corrV': float, 'temperature': float, 'nullPLL': bool } 
+                  plus everything from getLockInfo()
         '''
         ret = {}
         ret['courseTune'] = self.unpackU16(self.monitor(self.YTO_COARSE_TUNE))
@@ -366,12 +367,12 @@ class LODevice(FEMCDevice):
     
     def getLockInfo(self, info = None):
         '''
-        Get just the lock state info for the PLL:
-        { 'lockDetect': bool,     -> True if the raw lock detect voltage >= 3.0
-          'unlockDetected': bool, -> latching unlock detect bit
-          'refTP': float,         -> reference total power detector voltage
-          'IFTP': float,          -> IF total power detector voltage
-          'isLocked': bool }      -> True if lockDetect and abs(refTP) >= 0.5 and abs(IFTP) >= 0.5
+        Read just the lock state info for the PLL:
+        :return { 'lockDetect': bool,     -> True if the raw lock detect voltage >= 3.0
+                  'unlockDetected': bool, -> latching unlock detect bit
+                  'refTP': float,         -> reference total power detector voltage
+                  'IFTP': float,          -> IF total power detector voltage
+                  'isLocked': bool }      -> True if lockDetect and abs(refTP) >= 0.5 and abs(IFTP) >= 0.5
         '''
         if info is None:
             info = {}
@@ -384,10 +385,10 @@ class LODevice(FEMCDevice):
     
     def getPLLConfig(self):
         '''
-        Get the PLL configuration info:
-        { 'lockSB': int,         -> 0=LSB, 1=USB
-          'LoopBW': int }        -> 0=normal 7.5MHz/V (bands 2,4,8,9), 
-                                    1=alternate 15MHz/V (Band 3,5,6,7,10 & NRAO band 2 prototype) 
+        Read the PLL configuration info:
+        :return { 'lockSB': int,         -> 0=LSB, 1=USB
+                  'LoopBW': int }        -> 0=normal 7.5MHz/V (bands 2,4,8,9), 
+                                            1=alternate 15MHz/V (Band 3,5,6,7,10 & NRAO band 2 prototype) 
         '''
         ret = {}
         ret['lockSB'] = self.unpackU8(self.monitor(self.PLL_LOCK_SIDEBAND_SELECT))
@@ -396,8 +397,8 @@ class LODevice(FEMCDevice):
     
     def getPhotomixer(self):
         '''
-        Get the photomixer monitor info:
-        { 'enabled': bool, 'voltage': float, 'current': float mA }
+        Read the photomixer monitor info:
+        :return { 'enabled': bool, 'voltage': float, 'current': float mA }
         '''
         ret = {}
         ret['enabled'] = self.unpackBool(self.monitor(self.PHOTOMIXER_ENABLE))
@@ -407,9 +408,9 @@ class LODevice(FEMCDevice):
     
     def getAMC(self):
         '''
-        Get the active multiplier chain monitor info:
-        { 'VGA', 'VDA', 'IDA', 'VGB', 'VDB', 'IDB', 'VGE', 'VDE', 'IDE': all float V or mA,
-          'multDCounts': int, 'multDCurrent': float mA, 'supply5V': float } 
+        Read the active multiplier chain monitor info:
+        :return { 'VGA', 'VDA', 'IDA', 'VGB', 'VDB', 'IDB', 'VGE', 'VDE', 'IDE': all float V or mA,
+                  'multDCounts': int, 'multDCurrent': float mA, 'supply5V': float } 
         '''
         ret = {}
         ret['VGA'] = self.unpackFloat(self.monitor(self.AMC_GATE_A_VOLTAGE))
@@ -428,14 +429,14 @@ class LODevice(FEMCDevice):
 
     def getPA(self):
         '''
-        Get the power amplifier monitor info:
-        { 'VGp0': float,       -> gate voltage pol 0 (mapped, not the ambiguous pol A/B)
-          'VGp1': float,       -> gate voltage pol 1
-          'VDp0': float,       -> drain voltage pol 0
-          'VDp1': float,       -> drain voltage pol 1
-          'IDp0': float,       -> drain current mA pol 0
-          'IDp1': float,       -> drain current mA pol 1
-          'supply3V': float, 'supply5V': float }
+        Read the power amplifier monitor info:
+        :return { 'VGp0': float,       -> gate voltage pol 0 (mapped, not the ambiguous pol A/B)
+                  'VGp1': float,       -> gate voltage pol 1
+                  'VDp0': float,       -> drain voltage pol 0
+                  'VDp1': float,       -> drain voltage pol 1
+                  'IDp0': float,       -> drain current mA pol 0
+                  'IDp1': float,       -> drain current mA pol 1
+                  'supply3V': float, 'supply5V': float }
         '''
         ret = {}
         ret['VGp0'] = self.unpackFloat(self.monitor(self.PA_GATE_VOLTAGE))
@@ -450,10 +451,10 @@ class LODevice(FEMCDevice):
     
     def getTeledynePA(self):
         '''
-        Get info about the band 7 Teledyne power amplifier chips:
-        { 'hasTeledyne': bool,       -> True if Teledyne PA chips are configured
-          'collectorP0': int,        -> 0-255 digial pot setting for the pol 0 PA collector if hasTeledyne is True
-          'collectorP1': int }
+        Read the configuration related to band 7 Teledyne power amplifier chips:
+        :return { 'hasTeledyne': bool,       -> True if Teledyne PA chips are configured
+                  'collectorP0': int,        -> 0-255 digial pot setting for the pol 0 PA collector if hasTeledyne is True
+                  'collectorP1': int }
         '''
         ret = {}
         ret['hasTeledyne'] = self.unpackBool(self.monitor(self.PA_HAS_TELEDYNE_CHIP))

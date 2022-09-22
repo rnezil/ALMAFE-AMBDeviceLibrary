@@ -34,13 +34,13 @@ class LODevice(FEMCDevice):
         self.ytoLowGHz = lowGHz
         self.ytoHighGHz = highGHz
         
-    def setLOFrequency(self, freqGHz:float, coldMultipler:int = 1):
+    def setLOFrequency(self, freqGHz:float):
         # avoid divide by zero
-        if freqGHz == 0 or coldMultipler == 0:
-            self.__logMessage(f"setLOFrequency ERROR freqLOGHz={freqGHz} coldMultipler={coldMultipler}", True)
+        if freqGHz == 0:
+            self.__logMessage(f"setLOFrequency ERROR freqLOGHz={freqGHz}", True)
             return 0, 0, 0
         # frequency at the WCA outputs: 
-        wcaFreq = freqGHz / coldMultipler
+        wcaFreq = freqGHz / self.COLD_MULTIPLIERS[self.band]
         # YTO tuning frequency:
         ytoFreq = wcaFreq / self.WARM_MULTIPLIERS[self.band]
         ytoCourse = self.__ytoFreqToCourse(ytoFreq)
@@ -67,12 +67,12 @@ class LODevice(FEMCDevice):
             ytoFreq = self.ytoHighGHz
         return int((ytoFreq - self.ytoLowGHz) / (self.ytoHighGHz - self.ytoLowGHz) * 4095)
     
-    def lockPLL(self, freqLOGHz:float, coldMultipler:int = 1, freqFloogGHz:float = 0.0315):
+    def lockPLL(self, freqLOGHz:float, freqFloogGHz:float = 0.0315):
         numPoints = 9
         interval = 5
         self.__logMessage(f"lockPLL ICT_19283_LOCK_CV_Points={numPoints} interval={interval}...")
 
-        wcaFreq, ytoFreq, ytoCourse = self.setLOFrequency(freqLOGHz, coldMultipler)
+        wcaFreq, ytoFreq, ytoCourse = self.setLOFrequency(freqLOGHz)
         if wcaFreq == 0:
             self.__logMessage(f"freqLOGHz:{freqLOGHz} is out of range.")
             return 0, 0, 0
@@ -122,10 +122,12 @@ class LODevice(FEMCDevice):
     
                 # Gather data
                 pll = self.getPLL()
+                yto = self.getYTO()
                 self.__logMessage(f"lockPLL:points-3: isLocked={pll['isLocked']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
     
                 # Keep it if worth it
                 if pll['isLocked']:
+                    pll['courseTune'] = yto['courseTune']
                     pllVList.append(pll);
 
             # Fire: MAIN LOCK HERE
@@ -157,8 +159,8 @@ class LODevice(FEMCDevice):
                 lastPllV = pllVList[-1]
                 y1 = lastPllV['corrV']
                 y0 = firstPllV['corrV']
-                x1 = lastPllV['coarseTune']
-                x0 = firstPllV['coarseTune']
+                x1 = lastPllV['courseTune']
+                x0 = firstPllV['courseTune']
                 slope = (y1 - y0) / (x1 - x0)
 
                 # If we have a decreasing slope (good)
@@ -197,6 +199,7 @@ class LODevice(FEMCDevice):
 
     def adjustPLL(self, targetCV:Optional[float] = 0):
         pll = self.getLockInfo()
+        yto = self.getYTO()
         if not pll['isLocked']:
             self.__logMessage("adjustPLL ERROR: cant start search because PLL is not locked.")
             return None
@@ -207,7 +210,7 @@ class LODevice(FEMCDevice):
         self.__logMessage(f"adjustPLL: targetCV={targetCV} +/- {window} V ")
         
         errorCV = pll['corrV'] - targetCV
-        tryCourseTune = pll['courseTune']
+        tryCourseTune = yto['courseTune']
         self.__logMessage(f"adjustPLL CV={pll['corrV']} vError={errorCV} coarseYIG={tryCourseTune}")
 
         hiThreshold = targetCV + window
@@ -226,6 +229,7 @@ class LODevice(FEMCDevice):
         
         while not done and not error:
             pll = self.getLockInfo()
+            yto = self.getYTO()
             if loThreshold <= pll['corrV'] <= hiThreshold:
                 done = True
             # check for oscillations:
@@ -241,7 +245,7 @@ class LODevice(FEMCDevice):
                 else:
                     errorCV = pll['corrV'] - targetCV
                     tryCourseTune += (1 if errorCV > 0 else -1)
-                    distance = abs(tryCourseTune - pll['courseTune'])
+                    distance = abs(tryCourseTune - yto['courseTune'])
                     if distance > maxDistance:
                         error = True
                     elif 0 <= tryCourseTune <= 4095:
@@ -377,12 +381,16 @@ class LODevice(FEMCDevice):
         '''
         Read the PLL configuration info:
         :return { 'lockSB': int,         -> 0=LSB, 1=USB
-                  'LoopBW': int }        -> 0=normal 7.5MHz/V (bands 2,4,8,9), 
+                  'LoopBW': int,         -> 0=normal 7.5MHz/V (bands 2,4,8,9), 
                                             1=alternate 15MHz/V (Band 3,5,6,7,10 & NRAO band 2 prototype) 
+                  'warmMult' : int,
+                  'coldMult' : int }
         '''
         ret = {}
         ret['lockSB'] = self.unpackU8(self.monitor(self.PLL_LOCK_SIDEBAND_SELECT))
         ret['loopBW'] = self.unpackU8(self.monitor(self.PLL_LOOP_BANDWIDTH_SELECT))
+        ret['warmMult'] = self.WARM_MULTIPLIERS[self.band]
+        ret['coldMult'] = self.COLD_MULTIPLIERS[self.band]
         return ret
     
     def getPhotomixer(self):
@@ -468,6 +476,19 @@ class LODevice(FEMCDevice):
         8: 3,   # band 8
         9: 3,   # band 9
         10: 6   # band 10 
+    }
+        
+    COLD_MULTIPLIERS = {
+        1: 1,   # band 1
+        2: 1,   # band 2: ESO first article
+        3: 1,   # band 3
+        4: 2,   # band 4
+        5: 2,   # band 5
+        6: 3,   # band 6
+        7: 3,   # band 7
+        8: 6,   # band 8
+        9: 9,   # band 9
+        10: 9   # band 10 
     }
 
     DEFAULT_LOOPBW = {

@@ -5,8 +5,8 @@ AMBConnection represents a connection to a CAN bus.
   AMBConnection protects access to the bus so that multiple devices aren't talking at once.
   Implements bare CAN bus monitor, control, and node search.
 '''
-from typing import Optional
-from .AMBConnectionItf import AMBConnectionItf, BusNode
+from typing import Optional, List
+from .AMBConnectionItf import AMBConnectionItf, BusNode, AMBMessage
 import can
 from datetime import datetime
 from can.interfaces.nican import NicanError
@@ -120,7 +120,11 @@ class AMBConnectionNican(AMBConnectionItf):
         else:
             self.__logMessage(f"monitor failed:{nodeAddr:X}:{rca:X}")
             return None
-        
+
+    def runSequence(self, nodeAddr:int, sequence:List[AMBMessage]):
+        raise NotImplementedError
+
+
     def rcaToArbId(self, nodeAddr, rca):
         return ((nodeAddr + 1) << 18) + rca
     

@@ -38,10 +38,10 @@ class test_CCADevice(unittest.TestCase):
     def test_setSISHeater(self):
         self.dev.setSISHeater(False)
         sleep(0.01)
-        currentOff = self.dev.getHeaterCurrent()
+        currentOff = self.dev.getSISHeaterCurrent()
         self.dev.setSISHeater(True)
         sleep(0.01)
-        currentOn = self.dev.getHeaterCurrent()
+        currentOn = self.dev.getSISHeaterCurrent()
         print(f"SIS heater current off={currentOff} on={currentOn}")
         self.assertGreater(currentOn, currentOff)
         self.dev.setSISHeater(False)
@@ -103,7 +103,7 @@ class test_CCADevice(unittest.TestCase):
                     print(f"LNA pol{pol} lna{lna + 1}:", lnaData)
     
     def test_getHeaterCurrent(self):
-        current = self.dev.getHeaterCurrent()
+        current = self.dev.getSISHeaterCurrent()
         self.assertTrue(current != 0)
     
     def __checkAll(self, state:dict):

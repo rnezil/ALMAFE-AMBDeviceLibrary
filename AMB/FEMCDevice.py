@@ -143,12 +143,16 @@ class FEMCDevice(AMBDevice):
             return None
 
     def monitor(self, rca:int):
-        return self.__devMonitor(rca + ((self.femcPort - 1) << 12)) 
+        return self.__devMonitor(rca + self.femcPortOffset(self.femcPort)) 
                 
     def command(self, rca:int, data:bytes):
-        return self.__devCommand(rca + ((self.femcPort - 1) << 12), data)
+        return self.__devCommand(rca + self.femcPortOffset(self.femcPort), data)
     
-    @classmethod
+    @staticmethod
+    def femcPortOffset(femcPort: int):
+        return (femcPort - 1) << 12
+
+    @staticmethod
     def unpackStatusByte(data, expectedLen):
         if not data:
             return None
@@ -162,29 +166,29 @@ class FEMCDevice(AMBDevice):
         byte = cls.unpackU8(data, offset)
         return True if byte else False
     
-    @classmethod
-    def unpackU8(cls, data, offset = 0):
+    @staticmethod
+    def unpackU8(data, offset = 0):
         if not data or len(data) < (offset + 1):
             return None
         else:
             return data[offset]
     
-    @classmethod
-    def unpackU16(cls, data, offset = 0):
+    @staticmethod
+    def unpackU16(data, offset = 0):
         if not data or len(data) < (offset + 2): 
             return None
         else:
             return struct.unpack_from('!H', data, offset)[0]
 
-    @classmethod
-    def unpackU32(cls, data, offset = 0):
+    @staticmethod
+    def unpackU32(data, offset = 0):
         if not data or len(data) < (offset + 4): 
             return None
         else:
             return struct.unpack_from('!L', data, offset)[0]
 
-    @classmethod
-    def unpackFloat(cls, data, offset = 0):
+    @staticmethod
+    def unpackFloat(data, offset = 0):
         if not data or len(data) < (offset + 4): 
             return None
         else:
@@ -194,8 +198,8 @@ class FEMCDevice(AMBDevice):
     def packBool(cls, val, data = None, offset = 0):
         return cls.packU8(val, data, offset)
         
-    @classmethod
-    def packU8(cls, val, data = None, offset = 0):
+    @staticmethod
+    def packU8(val, data = None, offset = 0):
         if data:
             data = bytearray(data)
         else:
@@ -205,8 +209,8 @@ class FEMCDevice(AMBDevice):
         data[offset] = int(val) & 0xFF
         return bytes(data)
         
-    @classmethod
-    def packU16(cls, val, data = None, offset = 0):
+    @staticmethod
+    def packU16(val, data = None, offset = 0):
         if data:
             data = bytearray(data)
         else:
@@ -216,8 +220,8 @@ class FEMCDevice(AMBDevice):
         struct.pack_into('!H', data, offset, int(val))
         return bytes(data)
 
-    @classmethod
-    def packU32(cls, val, data = None, offset = 0):
+    @staticmethod
+    def packU32(val, data = None, offset = 0):
         if data:
             data = bytearray(data)
         else:
@@ -227,8 +231,8 @@ class FEMCDevice(AMBDevice):
         struct.pack_into('!L', data, offset, int(val))
         return bytes(data)
 
-    @classmethod    
-    def packFloat(cls, val, data = None, offset = 0):
+    @staticmethod    
+    def packFloat(val, data = None, offset = 0):
         if data:
             data = bytearray(data)
         else:

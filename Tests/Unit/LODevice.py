@@ -28,7 +28,7 @@ class test_LODevice(unittest.TestCase):
     
     def test_setLOFrequency(self):
         self.dev.setYTOLimits(14.0, 17.5)
-        (outputFreq, ytoFreq, ytoCourse) = self.dev.setLOFrequency(300, 3)
+        (outputFreq, ytoFreq, ytoCourse) = self.dev.setLOFrequency(300)
         self.assertTrue(outputFreq == 100)
         self.assertTrue(14.0 <= ytoFreq <= 17.5)
         self.assertTrue(0 <= ytoCourse <= 4095)
@@ -150,7 +150,6 @@ class test_LODevice(unittest.TestCase):
         self.assertTrue(yto['courseTune'] == 987)
         self.assertTrue(yto['lowGHz'] == 12.0)
         self.assertTrue(yto['highGHz'] == 15.5)
-        self.assertTrue(yto['stepSize'] == 3.5 / 4095)
         print("YTO: ", yto)
         
     def test_getPLL(self):

@@ -4,8 +4,9 @@ CCADevice represents cold cartridge bias module connected via an FEMC module
   Implements monitor and control of cold cartridge subsystems.
 '''
 
+from AMB.AMBConnectionDLL import AMBConnectionDLL
 from AMB.FEMCDevice import FEMCDevice
-from AMB.AMBConnectionItf import AMBConnectionItf
+from AMB.AMBConnectionItf import AMBConnectionItf, AMBMessage
 from datetime import datetime
 from typing import Optional
 from time import sleep
@@ -31,7 +32,7 @@ class CCADevice(FEMCDevice):
         :return True if success
         '''
         pol, sis = self.__checkPolAndDevice(pol, sis)
-        subsysOffset = (pol * self.POL1_OFFSET) + ((sis - 1) * self.DEVICE2_OFFSET)
+        subsysOffset = self.__subsysOffset(pol, sis)
         
         ret = True
         if Vj is not None:
@@ -95,7 +96,7 @@ class CCADevice(FEMCDevice):
         :return True if successful
         '''
         pol, lna = self.__checkPolAndDevice(pol, lna)
-        subsysOffset = (pol * self.POL1_OFFSET) + ((lna - 1) * self.DEVICE2_OFFSET)
+        subsysOffset = self.__subsysOffset(pol, lna)
         if VD1 is not None:
             self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset, self.packFloat(VD1))
         if VD2 is not None:
@@ -150,14 +151,14 @@ class CCADevice(FEMCDevice):
         :averaging int number of samples of Vj and Ij to average
         :return { 'Vj': float mV, 'Ij': float mA, 'Vmag': float, 'Imag': float mA, 'averaging': int }
         '''
-        if self.band in (1, 2):
+        if not self.hasSIS(self.band):
             return None
         pol, sis = self.__checkPolAndDevice(pol, sis)
         averaging = int(averaging)
         if averaging < 1:
             averaging = 1
 
-        subsysOffset = (pol * self.POL1_OFFSET) + ((sis - 1) * self.DEVICE2_OFFSET)
+        subsysOffset = self.__subsysOffset(pol, sis)
         
         sumVj = 0
         sumIj = 0
@@ -172,14 +173,31 @@ class CCADevice(FEMCDevice):
         ret['Imag'] = round(self.unpackFloat(self.monitor(self.SIS_MAGNET_CURRENT + subsysOffset)), 4)
         ret['averaging'] = averaging
         return ret
-    
+
+    def getSISSettings(self, pol: int, sis: int):
+        """
+        Get the set values for SIS voltage and magnet current
+        :param pol: int in 0..1
+        :param sis: int in 1=SIS1, 2=SIS2.  Corresponds to sideband in some bands.
+        :return { 'Vj': float mV, 'Imag': float mA }
+        """
+        if not self.hasSIS(self.band):
+            return None
+        pol, sis = self.__checkPolAndDevice(pol, sis)
+        subsysOffset = self.__subsysOffset(pol, sis)
+
+        return {
+            'Vj': self.unpackFloat(self.monitor(self.CMD_OFFSET + self.SIS_VOLTAGE + subsysOffset)),
+            'Imag': self.unpackFloat(self.monitor(self.CMD_OFFSET + self.SIS_MAGNET_CURRENT + subsysOffset))
+        }
+
     def getSISOpenLoop(self):
         '''
         Get the SIS open loop configuration:
         :return True if open loop
         '''
         return self.unpackBool(self.monitor(self.SIS_OPEN_LOOP))
-    
+
     def getLNA(self, pol:int, lna:int):
         '''
         Read the LNA monitor data for a specific pol and sb
@@ -192,7 +210,7 @@ class CCADevice(FEMCDevice):
                   'VG1' ... 'VG6': float } 
         '''
         pol, lna = self.__checkPolAndDevice(pol, lna)
-        subsysOffset = (pol * self.POL1_OFFSET) + ((lna - 1) * self.DEVICE2_OFFSET)
+        subsysOffset = self.__subsysOffset(pol, lna)
 
         ret = {}
         ret['enable'] = self.unpackBool(self.monitor(self.LNA_ENABLE + subsysOffset))
@@ -214,7 +232,138 @@ class CCADevice(FEMCDevice):
         :return float
         '''
         return round(self.unpackFloat(self.monitor(self.SIS_HEATER_CURRENT)), 4)
-    
+
+    def IVCurve(self, pol: int, sis: int, VjLow: float = None, VjHigh: float = None, VjStep: float = None):
+        pol, sis = self.__checkPolAndDevice(pol, sis)
+
+        if not self.hasSIS(self.band):
+            print(f"Band {self.dev.band} has no SIS.")
+            return None
+
+        if sis == 2 and not self.hasSIS2(self.band):
+            print(f"Band {self.dev.band} has no SIS.")
+            return None
+
+        # get and conditionally assign band-specific defaults:
+        dl, dh, ds = self.getIVCurveDefaults(self.band)
+        VjLow = VjLow if VjLow is not None else dl
+        VjHigh = VjHigh if VjHigh is not None else dh
+        VjStep = VjStep if VjStep is not None else ds
+
+        # sort the Vj inputs into min and max:
+        if VjHigh < VjLow:
+            VjLow, VjHigh = VjHigh, VjLow
+
+        # make VjStep positive for now:
+        VjStep = abs(VjStep)
+
+        # prevent divide by zero:
+        VjRange = VjHigh - VjLow
+        if VjRange == 0:
+            self.__logMessage(f"{VjLow} == {VjHigh} would divide by zero.")
+            return None
+        # check that VjRange is at least 1 step
+        elif VjRange < VjStep:
+            self.__logMessage(f"{VjLow}..{VjHigh} is smaller than one step.")
+            return None
+
+        # Sweep one or two ranges:
+        Vj1Negative = VjLow < 0
+        Vj2Positive = VjHigh > 0
+        zeroCrossing = Vj1Negative and Vj2Positive
+
+        # store the voltage setting in effect now:
+        priorState = self.getSISSettings(pol, sis)
+        subsysOffset = self.__subsysOffset(pol, sis) + self.femcPortOffset(self.femcPort)
+
+        sequence1 = []
+        sequence2 = []
+        result1 = []
+        result2 = []
+
+        # Sweep first range from negative towards zero:
+        if Vj1Negative:
+            endpt = 0 if zeroCrossing else VjHigh
+            self.__IVCurveInnerLoop(sequence1, subsysOffset, VjLow, endpt, VjStep)
+            result1 = self.conn.runSequence(self.nodeAddr, sequence1)
+            if not result1:
+                return None
+
+        # Sweep second range from positive towards zero:
+        if Vj2Positive:
+            endpt = 0 if zeroCrossing else VjLow
+            self.__IVCurveInnerLoop(sequence2, subsysOffset, VjHigh, endpt, -VjStep)
+            result2 = self.conn.runSequence(self.nodeAddr, sequence2)
+            if not result2:
+                return None
+        
+        VjSet = []
+        VjRead = []
+        IjRead = []
+        for i in range(int(len(result1) / 3)):
+            VjSet.append(self.unpackFloat(result1[i * 3].data))
+            VjRead.append(self.unpackFloat(result1[i * 3 + 1].data))
+            IjRead.append(self.unpackFloat(result1[i * 3 + 2].data))
+
+        # reverse the results from sequence2 so that VjSet increases monotonically:
+        for i in range(int(len(result2) / 3) - 1, -1, -1):
+            VjSet.append(self.unpackFloat(result2[i * 3].data))
+            VjRead.append(self.unpackFloat(result2[i * 3 + 1].data))
+            IjRead.append(self.unpackFloat(result2[i * 3 + 2].data))
+            
+        return (VjSet, VjRead, IjRead)
+
+    def __IVCurveInnerLoop(self, sequence, subsysOffset, Vj1, Vj2, VjStep):
+
+        # sweep to the first point:
+        VjSet = Vj1
+        self.command(self.CMD_OFFSET + self.SIS_VOLTAGE + subsysOffset, self.packFloat(VjSet))
+        sleep(.01)
+
+        done = False
+        while not done:
+            # set and read messages:
+            sequence.append(AMBMessage(
+                self.CMD_OFFSET + self.SIS_VOLTAGE + subsysOffset,
+                self.packFloat(VjSet)
+            ))
+            sequence.append(AMBMessage(
+                self.SIS_VOLTAGE + subsysOffset,
+                bytes(0)
+            ))
+            sequence.append(AMBMessage(
+                self.SIS_CURRENT + subsysOffset,
+                bytes(0)
+            ))
+            
+            # increment and loop end condition:
+            VjSet += VjStep
+
+            if VjStep < 0.0:
+                if VjSet <= Vj2:
+                    done = True
+            else:
+                if VjSet >= Vj2:
+                    done = True
+
+    @staticmethod
+    def getIVCurveDefaults(band):
+        numPoints = 401
+        VjMax = 3.0
+        
+        if band == 4:
+            VjMax = 6.5
+        elif band in (3, 6):
+            VjMax = 12.0
+        elif band in (5, 7, 8, 9, 10):
+            VjMax = 3.0
+        else:
+            return None
+        return (-VjMax, VjMax, (2 * VjMax) / (numPoints - 1))
+
+    def __subsysOffset(self, pol, device):
+        return (pol * self.POL1_OFFSET) + ((device - 1) * self.DEVICE2_OFFSET)
+
     def __checkPolAndDevice(self, pol:int, device:int):
         '''
         Coerce pol and device into legal ranges, depending on cartridge band
@@ -232,14 +381,22 @@ class CCADevice(FEMCDevice):
         elif device > 2:
             device = 2
         # only device 1 supported for bands 1, 2, 9, 10:
-        if self.band in (1, 2, 9, 10):
+        if not self.hasSIS2(self.band):
             device = 1
         return (pol, device)
     
     def __logMessage(self, msg, alwaysLog = False):
         if self.logInfo or alwaysLog:
             print(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + f" CCADevice band{self.band}: {msg}")
-    
+
+    @staticmethod
+    def hasSIS(band : int):
+        return band >= 3
+
+    @staticmethod
+    def hasSIS2(band: int):
+        return band in (3, 4, 5, 6, 7, 8)
+
     # RCAs used internally:
     CMD_OFFSET              = 0x10000
     POL1_OFFSET             = 0x0400

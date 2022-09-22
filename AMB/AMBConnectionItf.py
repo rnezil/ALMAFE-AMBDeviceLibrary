@@ -7,13 +7,19 @@ Implements bare CAN bus monitor, control, and node search.
 '''
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import List
 from pydantic import BaseModel
 
 class BusNode(BaseModel):
     address:int             # node address in 0..0xFF
     serialNum:bytes         # node serial number 8 bytes
-    
+
+class AMBMessage():
+    def __init__(self, RCA: int, data:bytes, timestamp:int = 0):
+        self.RCA = RCA
+        self.data = data
+        self.timestamp = timestamp
+
 class AMBConnectionItf(ABC):
 
     @abstractmethod
@@ -60,3 +66,6 @@ class AMBConnectionItf(ABC):
         ''' 
         pass
     
+    @abstractmethod
+    def runSequence(self, nodeAddr:int, sequence:List[AMBMessage]):
+        pass

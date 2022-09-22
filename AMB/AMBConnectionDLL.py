@@ -1,14 +1,15 @@
 '''
 AmbConnection implemented via the C++/Windows FrontEndAMB.dll
 '''
-from typing import Optional
-from .AMBConnectionItf import AMBConnectionItf, BusNode
+from typing import Optional, List
+from .AMBConnectionItf import AMBConnectionItf, BusNode, AMBMessage
 from .Utility import DLLClose
 import ctypes
+from copy import copy
 from datetime import datetime
 
 class AMBConnectionDLL(AMBConnectionItf):
-    
+
     def __init__(self, channel:Optional[int] = 0, dllName = r'L:\ALMA-FEControl\FrontEndControl2\FrontEndAMB.dll', logInfo = True):
         '''
         Constructor opens a connection using the FrontEndAMB.DLL                
@@ -98,7 +99,7 @@ class AMBConnectionDLL(AMBConnectionItf):
         r1 = ctypes.c_ubyte(nodeAddr)           # unsigned char nodeAddr
         r2 = ctypes.c_ulong(RCA)                # unsigned long RCA
         dataLen = ctypes.c_ushort(0)            # unsigned short *dataLength
-        data = ctypes.POINTER(ctypes.c_char)((ctypes.c_char * 8)())   
+        data = ctypes.POINTER(ctypes.c_char)((ctypes.c_char * 8)())
         # unsigned char *data
         
         self.dll.monitor.resstype = ctypes.c_ushort
@@ -108,7 +109,37 @@ class AMBConnectionDLL(AMBConnectionItf):
             return response
         else:
             return None
+
+    class MessageStruct(ctypes.Structure):
+        _fields_ = [
+            ("RCA", ctypes.c_ulong),
+            ("dataLength", ctypes.c_ushort),
+            ("data", ctypes.POINTER(ctypes.c_char * 8)),
+            ("timestamp", ctypes.c_ulonglong)
+        ]
     
+    def runSequence(self, nodeAddr:int, sequence:List[AMBMessage]):
+        contents = [
+            self.MessageStruct(
+                msg.RCA, 
+                len(msg.data),
+                ctypes.POINTER(ctypes.c_char * 8)((ctypes.c_char * 8)(*msg.data)),
+                0) 
+        for msg in sequence]
+
+        seq = (self.MessageStruct * len(contents))(*contents)
+
+        self.dll.runSequence.restype = ctypes.c_ushort
+        ret = self.dll.runSequence(ctypes.c_ubyte(nodeAddr), ctypes.byref(seq), ctypes.c_ulong(len(seq)))
+        if not ret == 0:
+            return None
+        else:
+            ret = []
+            for r in seq:
+                msg = AMBMessage(r.RCA, ctypes.string_at(r.data, r.dataLength), r.timestamp)
+                ret.append(msg)
+            return ret
+
     def __logMessage(self, msg, alwaysLog = False):
         if self.logInfo or alwaysLog:
             print(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " AMBConnectionDLL: " + msg)        

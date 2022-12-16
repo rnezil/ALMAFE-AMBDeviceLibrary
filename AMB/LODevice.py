@@ -337,12 +337,21 @@ class LODevice(FEMCDevice):
     def getYTO(self):
         '''
         Read the YIG oscillator monitor data and configuration:
-        :return { 'courseTune': int, 'lowGHz': float, 'highGHz': float }
+        :return {
+            'courseTune': int, 
+            'lowGHz': float, 
+            'highGHz': float, 
+            'ytoFreqGHz': float,    <-- YIG oscillator frequency
+            'loFreqGHz': float      <-- final 1st LO at mixer/downconverter
+        }
         '''
-        ret = {}
+        ret = {'ytoFreqGHz': 0, 'loFreqGHz': 0}
         ret['courseTune'] = self.unpackU16(self.monitor(self.YTO_COARSE_TUNE))
         ret['lowGHz'] = self.ytoLowGHz 
         ret['highGHz'] = self.ytoHighGHz 
+        if self.ytoLowGHz > 0 and self.ytoHighGHz > self.ytoLowGHz:
+            ret['ytoFreqGHz'] = self.ytoLowGHz + ((ret['courseTune'] / 4095) * (self.ytoHighGHz - self.ytoLowGHz));
+            ret['loFreqGHz'] = ret['ytoFreqGHz'] * self.WARM_MULTIPLIERS[self.band] * self.COLD_MULTIPLIERS[self.band]
         return ret
 
     def getPLL(self):

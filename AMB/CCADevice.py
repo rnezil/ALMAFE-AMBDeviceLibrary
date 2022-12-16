@@ -49,8 +49,8 @@ class CCADevice(FEMCDevice):
         '''
         return self.command(self.CMD_OFFSET + self.SIS_OPEN_LOOP, self.packBool(openLoop))
         
-    def setSISHeater(self, enable:bool):
-        return self.command(self.CMD_OFFSET + self.SIS_HEATER_ENABLE, self.packBool(enable))
+    def setSISHeater(self, pol: int, enable:bool):
+        return self.command(self.CMD_OFFSET + self.SIS_HEATER_ENABLE + pol * self.POL1_OFFSET, self.packBool(enable))
     
     def setLNAEnable(self, enable:bool, pol:int = -1, lna:int = -1):
         '''
@@ -226,12 +226,12 @@ class CCADevice(FEMCDevice):
                 ret[f"VG{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
         return ret
             
-    def getSISHeaterCurrent(self):
+    def getSISHeaterCurrent(self, pol: int):
         '''
         Get the SIS heater current 
         :return float
         '''
-        return round(self.unpackFloat(self.monitor(self.SIS_HEATER_CURRENT)), 4)
+        return round(self.unpackFloat(self.monitor(self.SIS_HEATER_CURRENT + pol * self.POL1_OFFSET)), 4)
 
     def IVCurve(self, pol: int, sis: int, VjLow: float = None, VjHigh: float = None, VjStep: float = None):
         pol, sis = self.__checkPolAndDevice(pol, sis)

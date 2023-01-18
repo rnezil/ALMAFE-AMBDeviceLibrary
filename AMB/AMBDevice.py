@@ -6,7 +6,7 @@ AMBDevice represents the lowest-level CAN bus device.
   Implements standard AMBSI monitor points.
 '''
 
-from AMB import AMBConnectionItf
+from AMB.AMBConnectionItf import AMBConnectionItf, AMBException
 from typing import Optional
 
 class AMBDevice():
@@ -38,31 +38,47 @@ class AMBDevice():
         return self.conn.monitor(self.nodeAddr, rca)
     
     def getAmbsiProtocolRev(self):
-        data = self.monitor(self.GET_AMBSI_PROTOCOL_REV)
-        return f"{data[0]}.{data[1]}.{data[2]}"
-        
+        try:
+            data = self.monitor(self.GET_AMBSI_PROTOCOL_REV)
+            return f"{data[0]}.{data[1]}.{data[2]}"
+        except AMBExeption:
+            return "0.0.0"
+            
     def getAmbsiErrors(self):
-        data = self.monitor(self.GET_AMBSI_ERRORS)
-        numErr = int.from_bytes(data[0:1], 'big')
-        lastErr = int(data[3])
-        return numErr, lastErr
-        
+        try:
+            data = self.monitor(self.GET_AMBSI_ERRORS)
+            numErr = int.from_bytes(data[0:1], 'big')
+            lastErr = int(data[3])
+            return numErr, lastErr
+        except AMBExeption:
+            return 0, 0
+
     def getAmbsiNumTrans(self):
-        data = self.monitor(self.GET_AMBSI_NUM_TRANS)
-        numTrans = int.from_bytes(data, 'big') 
-        return numTrans
-        
+        try:
+            data = self.monitor(self.GET_AMBSI_NUM_TRANS)
+            numTrans = int.from_bytes(data, 'big') 
+            return numTrans
+        except AMBExeption:
+            return 0
+
     def getAmbsiTemperature(self):
-        data = self.monitor(self.GET_AMBSI_TEMPERATURE)
-        temp = float(data[0] >> 1)
-        if data[1] != 0:
-            temp *= -1
-            temp += -1
-        if data[0] & 0x01:
-            temp += 0.5
-        return temp
+        try:
+            data = self.monitor(self.GET_AMBSI_TEMPERATURE)
+            temp = float(data[0] >> 1)
+            if data[1] != 0:
+                temp *= -1
+                temp += -1
+            if data[0] & 0x01:
+                temp += 0.5
+            return temp
+        except AMBExeption:
+            return 0.0
         
     def getAmbsiSoftwareRev(self):
-        data = self.monitor(self.GET_AMBSI_SOFTWARE_REV)
-        return f"{data[0]}.{data[1]}.{data[2]}"
+        try:
+            data = self.monitor(self.GET_AMBSI_SOFTWARE_REV)
+            return f"{data[0]}.{data[1]}.{data[2]}"
+        except AMBExeption:
+            return "0.0.0"
+
         

@@ -6,7 +6,7 @@ CCADevice represents cold cartridge bias module connected via an FEMC module
 
 from AMB.AMBConnectionDLL import AMBConnectionDLL
 from AMB.FEMCDevice import FEMCDevice
-from AMB.AMBConnectionItf import AMBConnectionItf, AMBMessage
+from AMB.AMBConnectionItf import AMBConnectionItf, AMBMessage, AMBException
 from datetime import datetime
 from typing import Optional
 from time import sleep
@@ -131,7 +131,10 @@ class CCADevice(FEMCDevice):
         return self.command(self.CMD_OFFSET + self.LNA_LED_ENABLE + pol * self.POL1_OFFSET, self.packBool(enable))
         
     def getLNALEDEnable(self, pol:int):
-        return self.unpackBool(self.monitor(self.LNA_LED_ENABLE + pol * self.POL1_OFFSET))
+        try:
+            return self.unpackBool(self.monitor(self.LNA_LED_ENABLE + pol * self.POL1_OFFSET))
+        except AMBException:
+            return False
 
     def getCartridgeTemps(self):
         '''
@@ -140,7 +143,10 @@ class CCADevice(FEMCDevice):
         '''
         ret = {}
         for i in range(6):
-            ret[f"temp{i}"] = round(self.unpackFloat(self.monitor(self.CARTRIDGE_TEMP + (i * self.CARTRIDGE_TEMP_OFFSET))), 4)
+            try:
+                ret[f"temp{i}"] = round(self.unpackFloat(self.monitor(self.CARTRIDGE_TEMP + (i * self.CARTRIDGE_TEMP_OFFSET))), 4)
+            except AMBException:
+                ret[f"temp{i}"] = 0.0
         return ret
     
     def getSIS(self, pol:int, sis:int, averaging:int = 1):
@@ -162,15 +168,22 @@ class CCADevice(FEMCDevice):
         
         sumVj = 0
         sumIj = 0
-        for _ in range(averaging):
-            sumVj += self.unpackFloat(self.monitor(self.SIS_VOLTAGE + subsysOffset))
-            sumIj += self.unpackFloat(self.monitor(self.SIS_CURRENT + subsysOffset))
+        try:
+            for _ in range(averaging):
+                sumVj += self.unpackFloat(self.monitor(self.SIS_VOLTAGE + subsysOffset))
+                sumIj += self.unpackFloat(self.monitor(self.SIS_CURRENT + subsysOffset))
+        except AMBException:
+            pass
         ret = {}
         
         ret['Vj'] = round(sumVj / averaging, 4)  
         ret['Ij'] = round(sumIj / averaging, 4) 
-        ret['Vmag'] = round(self.unpackFloat(self.monitor(self.SIS_MAGNET_VOLTAGE + subsysOffset)), 4)
-        ret['Imag'] = round(self.unpackFloat(self.monitor(self.SIS_MAGNET_CURRENT + subsysOffset)), 4)
+        try:
+            ret['Vmag'] = round(self.unpackFloat(self.monitor(self.SIS_MAGNET_VOLTAGE + subsysOffset)), 4)
+            ret['Imag'] = round(self.unpackFloat(self.monitor(self.SIS_MAGNET_CURRENT + subsysOffset)), 4)
+        except AMBException:
+            ret['Vmag'] = 0
+            ret['Imag'] = 0
         ret['averaging'] = averaging
         return ret
 
@@ -186,17 +199,23 @@ class CCADevice(FEMCDevice):
         pol, sis = self.__checkPolAndDevice(pol, sis)
         subsysOffset = self.__subsysOffset(pol, sis)
 
-        return {
-            'Vj': self.unpackFloat(self.monitor(self.CMD_OFFSET + self.SIS_VOLTAGE + subsysOffset)),
-            'Imag': self.unpackFloat(self.monitor(self.CMD_OFFSET + self.SIS_MAGNET_CURRENT + subsysOffset))
-        }
+        try:
+            return {
+                'Vj': self.unpackFloat(self.monitor(self.CMD_OFFSET + self.SIS_VOLTAGE + subsysOffset)),
+                'Imag': self.unpackFloat(self.monitor(self.CMD_OFFSET + self.SIS_MAGNET_CURRENT + subsysOffset))
+            }
+        except AMBException:
+            return {'Vj': 0, 'Imag': 0}
 
     def getSISOpenLoop(self):
         '''
         Get the SIS open loop configuration:
         :return True if open loop
         '''
-        return self.unpackBool(self.monitor(self.SIS_OPEN_LOOP))
+        try:
+            return self.unpackBool(self.monitor(self.SIS_OPEN_LOOP))
+        except AMBException:
+            return False
 
     def getLNA(self, pol:int, lna:int):
         '''
@@ -213,17 +232,32 @@ class CCADevice(FEMCDevice):
         subsysOffset = self.__subsysOffset(pol, lna)
 
         ret = {}
-        ret['enable'] = self.unpackBool(self.monitor(self.LNA_ENABLE + subsysOffset))
+        try:
+            ret['enable'] = self.unpackBool(self.monitor(self.LNA_ENABLE + subsysOffset))
+        except AMBException:
+            ret['enable'] = False
+
         for stage in range(3):
-            stageOffset = stage * self.LNA_STAGE_OFFSET
-            ret[f"VD{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + stageOffset)), 4)
-            ret[f"ID{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + stageOffset)), 4)
-            ret[f"VG{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + stageOffset)), 4)
+            try:
+                stageOffset = stage * self.LNA_STAGE_OFFSET
+                ret[f"VD{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + stageOffset)), 4)
+                ret[f"ID{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + stageOffset)), 4)
+                ret[f"VG{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + stageOffset)), 4)
+            except AMBException:
+                ret[f"VD{stage + 1}"] = 0
+                ret[f"ID{stage + 1}"] = 0
+                ret[f"VG{stage + 1}"] = 0
+
             if self.band in (1, 2):
                 # for bands 1 and 2 we return VD4...VD6 etc. by mapping to stages 1-3 of sb2
-                ret[f"VD{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
-                ret[f"ID{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
-                ret[f"VG{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
+                try:
+                    ret[f"VD{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
+                    ret[f"ID{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
+                    ret[f"VG{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
+                except AMBException:
+                    ret[f"VD{stage + 4}"] = 0
+                    ret[f"ID{stage + 4}"] = 0
+                    ret[f"VG{stage + 4}"] = 0
         return ret
             
     def getSISHeaterCurrent(self, pol: int):
@@ -231,7 +265,10 @@ class CCADevice(FEMCDevice):
         Get the SIS heater current 
         :return float
         '''
-        return round(self.unpackFloat(self.monitor(self.SIS_HEATER_CURRENT + pol * self.POL1_OFFSET)), 4)
+        try:
+            return round(self.unpackFloat(self.monitor(self.SIS_HEATER_CURRENT + pol * self.POL1_OFFSET)), 4)
+        except AMBException:
+            return 0
 
     def IVCurve(self, pol: int, sis: int, VjLow: float = None, VjHigh: float = None, VjStep: float = None):
         pol, sis = self.__checkPolAndDevice(pol, sis)
@@ -280,6 +317,12 @@ class CCADevice(FEMCDevice):
         sequence2 = []
         result1 = []
         result2 = []
+
+        # check that we can monitor SIS at all and abort if not:
+        try:
+            self.monitor(self.SIS_VOLTAGE + subsysOffset)
+        except AMBException:
+            return None
 
         # Sweep first range from negative towards zero:
         if Vj1Negative:

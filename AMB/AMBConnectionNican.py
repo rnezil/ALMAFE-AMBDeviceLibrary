@@ -6,7 +6,7 @@ AMBConnection represents a connection to a CAN bus.
   Implements bare CAN bus monitor, control, and node search.
 '''
 from typing import Optional, List
-from .AMBConnectionItf import AMBConnectionItf, BusNode, AMBMessage
+from .AMBConnectionItf import AMBConnectionItf, AMBException, BusNode, AMBMessage
 import can
 from datetime import datetime
 from can.interfaces.nican import NicanError
@@ -45,14 +45,19 @@ class AMBConnectionNican(AMBConnectionItf):
             self.__logMessage("NO CONNECTION.", True)
         else:
             self.__logMessage('connect.')
+        if not self.bus:
+            raise AMBException(f"AMBConnectionNican  initialize failed.")
         
     def shutdown(self):
         '''
         Close connection
         '''
-        if self.bus:
-            self.bus.shutdown()
-            self.__logMessage("shutdown.")
+        try:
+            if self.bus:
+                self.bus.shutdown()
+                self.__logMessage("shutdown.")
+        except:
+            pass
         self.channel = None
         self.bus = None
 
@@ -84,7 +89,7 @@ class AMBConnectionNican(AMBConnectionItf):
                 break
         return nodes
 
-    def command(self, nodeAddr:int, rca:int, data:bytes):
+    def command(self, nodeAddr:int, RCA:int, data:bytes):
         '''
         Send a command. No response is expected.
         :param nodeAddr destination node for the command
@@ -94,11 +99,11 @@ class AMBConnectionNican(AMBConnectionItf):
         '''
         if not self.bus:
             return False
-        msg = can.Message(arbitration_id=self.rcaToArbId(nodeAddr, rca), is_extended_id=True, data=data)
+        msg = can.Message(arbitration_id=self.rcaToArbId(nodeAddr, RCA), is_extended_id=True, data=data)
         self.bus.send(msg, timeout=self.SEND_TIMEOUT)
         return True
         
-    def monitor(self, nodeAddr:int, rca:int):
+    def monitor(self, nodeAddr:int, RCA:int):
         '''
         Send a monitor request and wait for the response.
         :param nodeAddr: destination node for the request
@@ -112,21 +117,19 @@ class AMBConnectionNican(AMBConnectionItf):
             msg = self.bus.recv(timeout=self.receiveTimeout)
             if msg is None:
                 break
-        msg = can.Message(arbitration_id=self.rcaToArbId(nodeAddr, rca), is_extended_id=True, data=b'')
+        msg = can.Message(arbitration_id=self.rcaToArbId(nodeAddr, RCA), is_extended_id=True, data=b'')
         self.bus.send(msg, timeout = self.SEND_TIMEOUT)
         msg = self.bus.recv(timeout = self.receiveTimeout)
         if msg is not None:
             return bytes(msg.data)
         else:
-            self.__logMessage(f"monitor failed:{nodeAddr:X}:{rca:X}")
-            return None
+            raise AMBException(f"monitor nodeAddr={nodeAddr:X} RCA={RCA:X} returned None")
 
     def runSequence(self, nodeAddr:int, sequence:List[AMBMessage]):
         raise NotImplementedError
 
-
-    def rcaToArbId(self, nodeAddr, rca):
-        return ((nodeAddr + 1) << 18) + rca
+    def rcaToArbId(self, nodeAddr, RCA):
+        return ((nodeAddr + 1) << 18) + RCA
     
     def __logMessage(self, msg, alwaysLog = False):
         if self.logInfo or alwaysLog:

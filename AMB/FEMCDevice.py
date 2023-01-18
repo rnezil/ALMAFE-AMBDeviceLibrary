@@ -6,7 +6,7 @@ FEMCDevice represents a device connected via an FEMC module.
   Implements standard FEMC module initializatiom, monitor, and control.
 '''
 from AMB.AMBDevice import AMBDevice
-from AMB.AMBConnectionItf import AMBConnectionItf
+from AMB.AMBConnectionItf import AMBConnectionItf, AMBException
 from typing import Optional
 from datetime import datetime
 import struct
@@ -54,14 +54,19 @@ class FEMCDevice(AMBDevice):
             self.self.setFeMode(mode)
             return True
         else:
-            data = self.__devMonitor(self.GET_SETUP_INFO)
-            if data is None:
-                self.__logMessage('GET_SETUP_INFO no data', True)
-            elif data == b'\x00' or data == b'\x05':
+            try:
+                data = self.__devMonitor(self.GET_SETUP_INFO)
+            except AMBException:
+                self.__logMessage('GET_SETUP_INFO exception', True)
+                return False
+            if data == b'\x00' or data == b'\x05':
                 self.initialized = True
                 if self.setFeMode(mode):
                     return True
             return False
+
+    def isConnected(self):
+        return self.initialized
 
     def setPort(self, femcPort:int):
         if femcPort >= self.PORT_FEMC_MODULE and femcPort <= self.PORT_FETIM:
@@ -73,11 +78,11 @@ class FEMCDevice(AMBDevice):
         super(FEMCDevice, self).shutdown()
        
     def getFemcVersion(self):
-        data = self.__devMonitor(self.GET_VERSION_INFO)
-        if data:
+        try:
+            data = self.__devMonitor(self.GET_VERSION_INFO)
             return f"data[0].data[1].data[2]"
-        else:
-            return None
+        except AMBException:
+            return "0.0.0"
 
     def setFeMode(self, mode:int):
         if mode == self.MODE_OPERATIONAL:
@@ -94,19 +99,22 @@ class FEMCDevice(AMBDevice):
         return self.__devCommand(self.SET_FE_MODE, data)
 
     def getFeMode(self):
-        data = self.__devMonitor(self.GET_FE_MODE)
-        if data:
+        try:
+            data = self.__devMonitor(self.GET_FE_MODE)
             return data[0]
-        else:
-            return None 
+        except AMBException:
+            return -1
 
     def getEsnList(self, reload = False):
         if reload:
             self.__devCommand(self.SET_READ_ESN, b'\x01')
             sleep(0.2)
-        data = self.__devMonitor(self.GET_ESNS_FOUND)
-        if not data:
-            return None
+        try:
+            data = self.__devMonitor(self.GET_ESNS_FOUND)
+            if not data:
+                return []
+        except AMBException:
+            return []
         ret = []
         for _ in range(data[0]):
             data = self.__devMonitor(self.GET_ESNS)
@@ -136,11 +144,11 @@ class FEMCDevice(AMBDevice):
             self.setBandPower(band + 1, False)
 
     def getNumBandsPowered(self):
-        data = self.__devMonitor(self.GET_NUM_BANDS_POWERED)
-        if data:
+        try:
+            data = self.__devMonitor(self.GET_NUM_BANDS_POWERED)
             return data[0]
-        else:
-            return None
+        except AMBException:
+            return -1
 
     def monitor(self, rca:int):
         return self.__devMonitor(rca + self.femcPortOffset(self.femcPort)) 

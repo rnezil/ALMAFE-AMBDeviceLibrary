@@ -2,7 +2,7 @@
 AmbConnection implemented via the C++/Windows FrontEndAMB.dll
 '''
 from typing import Optional, List
-from .AMBConnectionItf import AMBConnectionItf, BusNode, AMBMessage
+from .AMBConnectionItf import AMBConnectionItf, AMBException, BusNode, AMBMessage
 from .Utility import DLLClose
 import ctypes
 from copy import copy
@@ -23,8 +23,8 @@ class AMBConnectionDLL(AMBConnectionItf):
         self.dll = ctypes.CDLL(dllName)
         ret = self.dll.initialize()
         if ret != 0:
-            self.__logMessage("dll.initialize failed.", True)
             self.shutdown()
+            raise AMBException(f"AMBConnectionDLL '{dllName}' initialize failed.")
               
     def __del__(self):
         self.shutdown()
@@ -33,9 +33,12 @@ class AMBConnectionDLL(AMBConnectionItf):
         '''
         Close connection
         '''
-        if self.dll:
-            self.dll.shutdown()
-            DLLClose.dlclose(self.dll._handle)
+        try:
+            if self.dll:
+                self.dll.shutdown()
+                DLLClose.dlclose(self.dll._handle)
+        except:
+            pass
         self.channel = None
         self.dll = None
     
@@ -108,7 +111,7 @@ class AMBConnectionDLL(AMBConnectionItf):
             response = bytes(data[:dataLen.value])
             return response
         else:
-            return None
+            raise AMBException(f"monitor nodeAddr={nodeAddr} RCA={RCA:X} returned {ret}")
 
     class MessageStruct(ctypes.Structure):
         _fields_ = [
@@ -132,7 +135,7 @@ class AMBConnectionDLL(AMBConnectionItf):
         self.dll.runSequence.restype = ctypes.c_ushort
         ret = self.dll.runSequence(ctypes.c_ubyte(nodeAddr), ctypes.byref(seq), ctypes.c_ulong(len(seq)))
         if not ret == 0:
-            return None
+            raise AMBException(f"runSequence returned {ret}")
         else:
             ret = []
             for r in seq:

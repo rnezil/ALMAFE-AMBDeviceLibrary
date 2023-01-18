@@ -5,7 +5,7 @@ LODevice represents a standarf local oscillator connected via an FEMC module.
   Implements monitor and control of LO subsystems, lock search, and zero correction voltage.
 '''
 from AMB.FEMCDevice import FEMCDevice
-from AMB.AMBConnectionItf import AMBConnectionItf
+from AMB.AMBConnectionItf import AMBConnectionItf, AMBException
 from datetime import datetime
 from typing import Optional
 from time import sleep
@@ -345,13 +345,16 @@ class LODevice(FEMCDevice):
             'loFreqGHz': float      <-- final 1st LO at mixer/downconverter
         }
         '''
-        ret = {'ytoFreqGHz': 0, 'loFreqGHz': 0}
-        ret['courseTune'] = self.unpackU16(self.monitor(self.YTO_COARSE_TUNE))
-        ret['lowGHz'] = self.ytoLowGHz 
-        ret['highGHz'] = self.ytoHighGHz 
-        if self.ytoLowGHz > 0 and self.ytoHighGHz > self.ytoLowGHz:
-            ret['ytoFreqGHz'] = self.ytoLowGHz + ((ret['courseTune'] / 4095) * (self.ytoHighGHz - self.ytoLowGHz));
-            ret['loFreqGHz'] = ret['ytoFreqGHz'] * self.WARM_MULTIPLIERS[self.band] * self.COLD_MULTIPLIERS[self.band]
+        ret = {'ytoFreqGHz': 0, 'loFreqGHz': 0, 'courseTune': 0, 'lowGHz': 0, 'highGHz': 0}
+        try:
+            ret['courseTune'] = self.unpackU16(self.monitor(self.YTO_COARSE_TUNE))
+            ret['lowGHz'] = self.ytoLowGHz 
+            ret['highGHz'] = self.ytoHighGHz 
+            if self.ytoLowGHz > 0 and self.ytoHighGHz > self.ytoLowGHz:
+                ret['ytoFreqGHz'] = self.ytoLowGHz + ((ret['courseTune'] / 4095) * (self.ytoHighGHz - self.ytoLowGHz));
+                ret['loFreqGHz'] = ret['ytoFreqGHz'] * self.WARM_MULTIPLIERS[self.band] * self.COLD_MULTIPLIERS[self.band]
+        except AMBException:
+            pass
         return ret
 
     def getPLL(self):
@@ -360,10 +363,13 @@ class LODevice(FEMCDevice):
         :return { 'courseTune': int, 'temperature': float, 'nullPLL': bool } 
                   plus everything from getLockInfo()
         '''
-        ret = {}
-        ret['courseTune'] = self.unpackU16(self.monitor(self.YTO_COARSE_TUNE))
-        ret['temperature'] = round(self.unpackFloat(self.monitor(self.PLL_ASSEMBLY_TEMP)), 3)
-        ret['nullPLL'] = self.unpackBool(self.monitor(self.PLL_NULL_LOOP_INTEGRATOR))
+        ret = {'courseTune': 0, 'temperature': 0, 'nullPLL': False}
+        try:
+            ret['courseTune'] = self.unpackU16(self.monitor(self.YTO_COARSE_TUNE))
+            ret['temperature'] = round(self.unpackFloat(self.monitor(self.PLL_ASSEMBLY_TEMP)), 3)
+            ret['nullPLL'] = self.unpackBool(self.monitor(self.PLL_NULL_LOOP_INTEGRATOR))
+        except:
+            pass
         return self.getLockInfo(ret)
     
     def getLockInfo(self, info = None):
@@ -376,14 +382,19 @@ class LODevice(FEMCDevice):
                   'corrV': float,         -> PLL correction voltage 
                   'isLocked': bool }      -> True if lockDetect and abs(refTP) >= 0.5 and abs(IFTP) >= 0.5
         '''
+        defaults = {'lockDetectBit': False, 'unlockDetected': False, 'refTP': 0, 'IFTP': 0, 'corrV': 0, 'isLocked': False}
         if info is None:
             info = {}
-        info['lockDetectBit'] = self.unpackFloat(self.monitor(self.PLL_LOCK_DETECT_VOLTAGE)) >= 3.0
-        info['unlockDetected'] = self.unpackBool(self.monitor(self.PLL_UNLOCK_DETECT_LATCH))
-        info['refTP'] = round(self.unpackFloat(self.monitor(self.PLL_REF_TOTAL_POWER)), 4)
-        info['IFTP'] = round(self.unpackFloat(self.monitor(self.PLL_IF_TOTAL_POWER)), 4)
-        info['corrV'] = round(self.unpackFloat(self.monitor(self.PLL_CORRECTION_VOLTAGE)), 4)
-        info['isLocked'] = info['lockDetectBit'] and abs(info['refTP']) >= 0.5 and abs(info['IFTP']) >= 0.5
+        info = {**info, **defaults}
+        try:
+            info['lockDetectBit'] = self.unpackFloat(self.monitor(self.PLL_LOCK_DETECT_VOLTAGE)) >= 3.0
+            info['unlockDetected'] = self.unpackBool(self.monitor(self.PLL_UNLOCK_DETECT_LATCH))
+            info['refTP'] = round(self.unpackFloat(self.monitor(self.PLL_REF_TOTAL_POWER)), 4)
+            info['IFTP'] = round(self.unpackFloat(self.monitor(self.PLL_IF_TOTAL_POWER)), 4)
+            info['corrV'] = round(self.unpackFloat(self.monitor(self.PLL_CORRECTION_VOLTAGE)), 4)
+            info['isLocked'] = info['lockDetectBit'] and abs(info['refTP']) >= 0.5 and abs(info['IFTP']) >= 0.5
+        except AMBException:
+            pass
         return info
     
     def getPLLConfig(self):
@@ -395,11 +406,14 @@ class LODevice(FEMCDevice):
                   'warmMult' : int,
                   'coldMult' : int }
         '''
-        ret = {}
-        ret['lockSB'] = self.unpackU8(self.monitor(self.PLL_LOCK_SIDEBAND_SELECT))
-        ret['loopBW'] = self.unpackU8(self.monitor(self.PLL_LOOP_BANDWIDTH_SELECT))
-        ret['warmMult'] = self.WARM_MULTIPLIERS[self.band]
-        ret['coldMult'] = self.COLD_MULTIPLIERS[self.band]
+        ret = {'lockSB': 0, 'loopBW': 0, 'warmMult': 1, 'coldMult': 1}
+        try:
+            ret['lockSB'] = self.unpackU8(self.monitor(self.PLL_LOCK_SIDEBAND_SELECT))
+            ret['loopBW'] = self.unpackU8(self.monitor(self.PLL_LOOP_BANDWIDTH_SELECT))
+            ret['warmMult'] = self.WARM_MULTIPLIERS[self.band]
+            ret['coldMult'] = self.COLD_MULTIPLIERS[self.band]
+        except AMBException:
+            pass
         return ret
     
     def getPhotomixer(self):
@@ -407,10 +421,13 @@ class LODevice(FEMCDevice):
         Read the photomixer monitor info:
         :return { 'enabled': bool, 'voltage': float, 'current': float mA }
         '''
-        ret = {}
-        ret['enabled'] = self.unpackBool(self.monitor(self.PHOTOMIXER_ENABLE))
-        ret['voltage'] = round(self.unpackFloat(self.monitor(self.PHOTOMIXER_VOLTAGE)), 4)
-        ret['current'] = round(self.unpackFloat(self.monitor(self.PHOTOMIXER_CURRENT)), 4)
+        ret = {'enabled': False, 'voltage': 0, 'current': 0}
+        try:
+            ret['enabled'] = self.unpackBool(self.monitor(self.PHOTOMIXER_ENABLE))
+            ret['voltage'] = round(self.unpackFloat(self.monitor(self.PHOTOMIXER_VOLTAGE)), 4)
+            ret['current'] = round(self.unpackFloat(self.monitor(self.PHOTOMIXER_CURRENT)), 4)
+        except AMBException:
+            pass
         return ret
     
     def getAMC(self):
@@ -419,19 +436,25 @@ class LODevice(FEMCDevice):
         :return { 'VGA', 'VDA', 'IDA', 'VGB', 'VDB', 'IDB', 'VGE', 'VDE', 'IDE': all float V or mA,
                   'multDCounts': int, 'multDCurrent': float mA, 'supply5V': float } 
         '''
-        ret = {}
-        ret['VGA'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_A_VOLTAGE)), 4)
-        ret['VDA'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_A_VOLTAGE)), 4)
-        ret['IDA'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_A_CURRENT)), 4)
-        ret['VGB'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_B_VOLTAGE)), 4)
-        ret['VDB'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_B_VOLTAGE)), 4)
-        ret['IDB'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_B_CURRENT)), 4)
-        ret['multDCounts'] = self.unpackU8(self.monitor(self.AMC_MULTIPLIER_D_COUNTS))
-        ret['multDCurrent'] = round(self.unpackFloat(self.monitor(self.AMC_MULTIPLIER_D_CURRENT)), 4)
-        ret['VGE'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_E_VOLTAGE)), 4)
-        ret['VDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_VOLTAGE)), 4)
-        ret['IDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_CURRENT)), 4)
-        ret['supply5V'] = round(self.unpackFloat(self.monitor(self.AMC_SUPPLY_VOLTAGE_5V)), 4)
+        ret = {'VGA': 0, 'VDA': 0, 'IDA': 0, 
+               'VGB': 0, 'VDB': 0, 'IDB': 0, 
+               'VGE': 0, 'VDE': 0, 'IDE': 0, 
+               'multDCounts': 0, 'multDCurrent': 0, 'supply5V': 0}
+        try:
+            ret['VGA'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_A_VOLTAGE)), 4)
+            ret['VDA'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_A_VOLTAGE)), 4)
+            ret['IDA'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_A_CURRENT)), 4)
+            ret['VGB'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_B_VOLTAGE)), 4)
+            ret['VDB'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_B_VOLTAGE)), 4)
+            ret['IDB'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_B_CURRENT)), 4)
+            ret['multDCounts'] = self.unpackU8(self.monitor(self.AMC_MULTIPLIER_D_COUNTS))
+            ret['multDCurrent'] = round(self.unpackFloat(self.monitor(self.AMC_MULTIPLIER_D_CURRENT)), 4)
+            ret['VGE'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_E_VOLTAGE)), 4)
+            ret['VDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_VOLTAGE)), 4)
+            ret['IDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_CURRENT)), 4)
+            ret['supply5V'] = round(self.unpackFloat(self.monitor(self.AMC_SUPPLY_VOLTAGE_5V)), 4)
+        except AMBException:
+            pass
         return ret
 
     def getPA(self):
@@ -445,15 +468,18 @@ class LODevice(FEMCDevice):
                   'IDp1': float,       -> drain current mA pol 1
                   'supply3V': float, 'supply5V': float }
         '''
-        ret = {}
-        ret['VGp0'] = round(self.unpackFloat(self.monitor(self.PA_GATE_VOLTAGE)), 4)
-        ret['VGp1'] = round(self.unpackFloat(self.monitor(self.PA_GATE_VOLTAGE + self.POL1_OFFSET)), 4)
-        ret['VDp0'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_VOLTAGE)), 4)
-        ret['VDp1'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_VOLTAGE + self.POL1_OFFSET)), 4)
-        ret['IDp0'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_CURRENT)), 4)
-        ret['IDp1'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_CURRENT + self.POL1_OFFSET)), 4)
-        ret['supply3V'] = round(self.unpackFloat(self.monitor(self.PA_SUPPLY_VOLTAGE_3V)), 4)
-        ret['supply5V'] = round(self.unpackFloat(self.monitor(self.PA_SUPPLY_VOLTAGE_5V)), 4)
+        ret = {'VGp0': 0, 'VGp1': 0, 'VDp0': 0, 'VDp1': 0, 'IDp0': 0, 'IDp1': 0, 'supply3V': 0, 'supply5V': 0}
+        try:
+            ret['VGp0'] = round(self.unpackFloat(self.monitor(self.PA_GATE_VOLTAGE)), 4)
+            ret['VGp1'] = round(self.unpackFloat(self.monitor(self.PA_GATE_VOLTAGE + self.POL1_OFFSET)), 4)
+            ret['VDp0'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_VOLTAGE)), 4)
+            ret['VDp1'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_VOLTAGE + self.POL1_OFFSET)), 4)
+            ret['IDp0'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_CURRENT)), 4)
+            ret['IDp1'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_CURRENT + self.POL1_OFFSET)), 4)
+            ret['supply3V'] = round(self.unpackFloat(self.monitor(self.PA_SUPPLY_VOLTAGE_3V)), 4)
+            ret['supply5V'] = round(self.unpackFloat(self.monitor(self.PA_SUPPLY_VOLTAGE_5V)), 4)
+        except AMBException:
+            pass
         return ret
     
     def getTeledynePA(self):
@@ -463,10 +489,13 @@ class LODevice(FEMCDevice):
                   'collectorP0': int,        -> 0-255 digial pot setting for the pol 0 PA collector if hasTeledyne is True
                   'collectorP1': int }
         '''
-        ret = {}
-        ret['hasTeledyne'] = self.unpackBool(self.monitor(self.PA_HAS_TELEDYNE_CHIP))
-        ret['collectorP0'] = self.unpackU8(self.monitor(self.PA_TELEDYNE_COLLECTOR)) 
-        ret['collectorP1'] = self.unpackU8(self.monitor(self.PA_TELEDYNE_COLLECTOR + self.POL1_OFFSET)) 
+        ret = {'hasTeledyne': False, 'collectorP0': 0, 'collectorP1': 0}
+        try:
+            ret['hasTeledyne'] = self.unpackBool(self.monitor(self.PA_HAS_TELEDYNE_CHIP))
+            ret['collectorP0'] = self.unpackU8(self.monitor(self.PA_TELEDYNE_COLLECTOR)) 
+            ret['collectorP1'] = self.unpackU8(self.monitor(self.PA_TELEDYNE_COLLECTOR + self.POL1_OFFSET)) 
+        except AMBException:
+            pass
         return ret
     
     def __logMessage(self, msg, alwaysLog = False):

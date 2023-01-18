@@ -20,6 +20,10 @@ class AMBMessage():
         self.data = data
         self.timestamp = timestamp
 
+class AMBException(Exception):
+    def __init__(self, *args):
+        super(AMBException, self).__init__(*args)
+
 class AMBConnectionItf(ABC):
 
     @abstractmethod

@@ -6,7 +6,7 @@ FEMCDevice represents a device connected via an FEMC module.
   Implements standard FEMC module initializatiom, monitor, and control.
 '''
 from AMB.AMBDevice import AMBDevice
-from AMB.AMBConnectionItf import AMBConnectionItf, AMBException
+from AMB.AMBConnectionItf import AMBConnectionItf, AMBConnectionError
 from typing import Optional
 from datetime import datetime
 import struct
@@ -56,7 +56,7 @@ class FEMCDevice(AMBDevice):
         else:
             try:
                 data = self.__devMonitor(self.GET_SETUP_INFO)
-            except AMBException:
+            except AMBConnectionError:
                 self.__logMessage('GET_SETUP_INFO exception', True)
                 return False
             if data == b'\x00' or data == b'\x05':
@@ -81,7 +81,7 @@ class FEMCDevice(AMBDevice):
         try:
             data = self.__devMonitor(self.GET_VERSION_INFO)
             return f"data[0].data[1].data[2]"
-        except AMBException:
+        except AMBConnectionError:
             return "0.0.0"
 
     def setFeMode(self, mode:int):
@@ -102,7 +102,7 @@ class FEMCDevice(AMBDevice):
         try:
             data = self.__devMonitor(self.GET_FE_MODE)
             return data[0]
-        except AMBException:
+        except AMBConnectionError:
             return -1
 
     def getEsnList(self, reload = False):
@@ -113,7 +113,7 @@ class FEMCDevice(AMBDevice):
             data = self.__devMonitor(self.GET_ESNS_FOUND)
             if not data:
                 return []
-        except AMBException:
+        except AMBConnectionError:
             return []
         ret = []
         for _ in range(data[0]):
@@ -147,7 +147,7 @@ class FEMCDevice(AMBDevice):
         try:
             data = self.__devMonitor(self.GET_NUM_BANDS_POWERED)
             return data[0]
-        except AMBException:
+        except AMBConnectionError:
             return -1
 
     def monitor(self, rca:int):

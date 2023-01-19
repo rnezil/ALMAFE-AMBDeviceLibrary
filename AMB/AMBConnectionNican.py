@@ -6,7 +6,7 @@ AMBConnection represents a connection to a CAN bus.
   Implements bare CAN bus monitor, control, and node search.
 '''
 from typing import Optional, List
-from .AMBConnectionItf import AMBConnectionItf, AMBException, BusNode, AMBMessage
+from .AMBConnectionItf import AMBConnectionItf, AMBConnectionError, BusNode, AMBMessage
 import can
 from datetime import datetime
 from can.interfaces.nican import NicanError
@@ -46,7 +46,7 @@ class AMBConnectionNican(AMBConnectionItf):
         else:
             self.__logMessage('connect.')
         if not self.bus:
-            raise AMBException(f"AMBConnectionNican  initialize failed.")
+            raise AMBConnectionError(f"AMBConnectionNican  initialize failed.")
         
     def shutdown(self):
         '''
@@ -123,7 +123,7 @@ class AMBConnectionNican(AMBConnectionItf):
         if msg is not None:
             return bytes(msg.data)
         else:
-            raise AMBException(f"monitor nodeAddr={nodeAddr:X} RCA={RCA:X} returned None")
+            raise AMBConnectionError(f"monitor nodeAddr={nodeAddr:X} RCA={RCA:X} returned None")
 
     def runSequence(self, nodeAddr:int, sequence:List[AMBMessage]):
         raise NotImplementedError

@@ -5,7 +5,7 @@ LODevice represents a standarf local oscillator connected via an FEMC module.
   Implements monitor and control of LO subsystems, lock search, and zero correction voltage.
 '''
 from AMB.FEMCDevice import FEMCDevice
-from AMB.AMBConnectionItf import AMBConnectionItf, AMBException
+from AMB.AMBConnectionItf import AMBConnectionItf, AMBConnectionError
 from datetime import datetime
 from typing import Optional
 from time import sleep
@@ -353,7 +353,7 @@ class LODevice(FEMCDevice):
             if self.ytoLowGHz > 0 and self.ytoHighGHz > self.ytoLowGHz:
                 ret['ytoFreqGHz'] = self.ytoLowGHz + ((ret['courseTune'] / 4095) * (self.ytoHighGHz - self.ytoLowGHz));
                 ret['loFreqGHz'] = ret['ytoFreqGHz'] * self.WARM_MULTIPLIERS[self.band] * self.COLD_MULTIPLIERS[self.band]
-        except AMBException:
+        except AMBConnectionError:
             pass
         return ret
 
@@ -393,7 +393,7 @@ class LODevice(FEMCDevice):
             info['IFTP'] = round(self.unpackFloat(self.monitor(self.PLL_IF_TOTAL_POWER)), 4)
             info['corrV'] = round(self.unpackFloat(self.monitor(self.PLL_CORRECTION_VOLTAGE)), 4)
             info['isLocked'] = info['lockDetectBit'] and abs(info['refTP']) >= 0.5 and abs(info['IFTP']) >= 0.5
-        except AMBException:
+        except AMBConnectionError:
             pass
         return info
     
@@ -412,7 +412,7 @@ class LODevice(FEMCDevice):
             ret['loopBW'] = self.unpackU8(self.monitor(self.PLL_LOOP_BANDWIDTH_SELECT))
             ret['warmMult'] = self.WARM_MULTIPLIERS[self.band]
             ret['coldMult'] = self.COLD_MULTIPLIERS[self.band]
-        except AMBException:
+        except AMBConnectionError:
             pass
         return ret
     
@@ -426,7 +426,7 @@ class LODevice(FEMCDevice):
             ret['enabled'] = self.unpackBool(self.monitor(self.PHOTOMIXER_ENABLE))
             ret['voltage'] = round(self.unpackFloat(self.monitor(self.PHOTOMIXER_VOLTAGE)), 4)
             ret['current'] = round(self.unpackFloat(self.monitor(self.PHOTOMIXER_CURRENT)), 4)
-        except AMBException:
+        except AMBConnectionError:
             pass
         return ret
     
@@ -453,7 +453,7 @@ class LODevice(FEMCDevice):
             ret['VDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_VOLTAGE)), 4)
             ret['IDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_CURRENT)), 4)
             ret['supply5V'] = round(self.unpackFloat(self.monitor(self.AMC_SUPPLY_VOLTAGE_5V)), 4)
-        except AMBException:
+        except AMBConnectionError:
             pass
         return ret
 
@@ -478,7 +478,7 @@ class LODevice(FEMCDevice):
             ret['IDp1'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_CURRENT + self.POL1_OFFSET)), 4)
             ret['supply3V'] = round(self.unpackFloat(self.monitor(self.PA_SUPPLY_VOLTAGE_3V)), 4)
             ret['supply5V'] = round(self.unpackFloat(self.monitor(self.PA_SUPPLY_VOLTAGE_5V)), 4)
-        except AMBException:
+        except AMBConnectionError:
             pass
         return ret
     
@@ -494,7 +494,7 @@ class LODevice(FEMCDevice):
             ret['hasTeledyne'] = self.unpackBool(self.monitor(self.PA_HAS_TELEDYNE_CHIP))
             ret['collectorP0'] = self.unpackU8(self.monitor(self.PA_TELEDYNE_COLLECTOR)) 
             ret['collectorP1'] = self.unpackU8(self.monitor(self.PA_TELEDYNE_COLLECTOR + self.POL1_OFFSET)) 
-        except AMBException:
+        except AMBConnectionError:
             pass
         return ret
     

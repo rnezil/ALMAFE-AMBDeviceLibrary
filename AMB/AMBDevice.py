@@ -6,7 +6,7 @@ AMBDevice represents the lowest-level CAN bus device.
   Implements standard AMBSI monitor points.
 '''
 
-from AMB.AMBConnectionItf import AMBConnectionItf, AMBException
+from AMB.AMBConnectionItf import AMBConnectionItf, AMBConnectionError
 from typing import Optional
 
 class AMBDevice():

@@ -2,7 +2,7 @@
 AmbConnection implemented via the C++/Windows FrontEndAMB.dll
 '''
 from typing import Optional, List
-from .AMBConnectionItf import AMBConnectionItf, AMBException, BusNode, AMBMessage
+from .AMBConnectionItf import AMBConnectionItf, AMBConnectionError, BusNode, AMBMessage
 from .Utility import DLLClose
 import ctypes
 from copy import copy
@@ -24,7 +24,7 @@ class AMBConnectionDLL(AMBConnectionItf):
         ret = self.dll.initialize()
         if ret != 0:
             self.shutdown()
-            raise AMBException(f"AMBConnectionDLL '{dllName}' initialize failed.")
+            raise AMBConnectionError(f"AMBConnectionDLL '{dllName}' initialize failed.")
               
     def __del__(self):
         self.shutdown()
@@ -111,7 +111,7 @@ class AMBConnectionDLL(AMBConnectionItf):
             response = bytes(data[:dataLen.value])
             return response
         else:
-            raise AMBException(f"monitor nodeAddr={nodeAddr} RCA={RCA:X} returned {ret}")
+            raise AMBConnectionError(f"monitor nodeAddr={nodeAddr} RCA={RCA:X} returned {ret}")
 
     class MessageStruct(ctypes.Structure):
         _fields_ = [
@@ -135,7 +135,7 @@ class AMBConnectionDLL(AMBConnectionItf):
         self.dll.runSequence.restype = ctypes.c_ushort
         ret = self.dll.runSequence(ctypes.c_ubyte(nodeAddr), ctypes.byref(seq), ctypes.c_ulong(len(seq)))
         if not ret == 0:
-            raise AMBException(f"runSequence returned {ret}")
+            raise AMBConnectionError(f"runSequence returned {ret}")
         else:
             ret = []
             for r in seq:

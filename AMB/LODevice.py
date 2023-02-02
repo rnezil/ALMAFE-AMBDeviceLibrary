@@ -317,6 +317,13 @@ class LODevice(FEMCDevice):
                 ret = False
         return ret 
 
+    def setPAOutput(self, pol:int, percent:float):
+        if percent < 0:
+            percent = 0
+        if percent > 100:
+            percent = 100        
+        self.setPABias(pol, 2.5 * percent / 100)
+
     def setTeledynePAConfig(self, hasTeledyne:bool, collectorP0:int = 0, collectorP1:int = 0):
         if self.band != 7:
             self.__logMessage(f"Set Teledyne PA config is not supported for band {self.band}.", True)

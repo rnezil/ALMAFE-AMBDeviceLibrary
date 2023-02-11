@@ -80,7 +80,7 @@ class FEMCDevice(AMBDevice):
     def getFemcVersion(self):
         try:
             data = self.__devMonitor(self.GET_VERSION_INFO)
-            return f"data[0].data[1].data[2]"
+            return f"{data[0]}.{data[1]}.{data[2]}"
         except AMBConnectionError:
             return "0.0.0"
 

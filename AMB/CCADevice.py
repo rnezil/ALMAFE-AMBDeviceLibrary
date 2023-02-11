@@ -179,11 +179,16 @@ class CCADevice(FEMCDevice):
         ret['Vj'] = round(sumVj / averaging, 4)  
         ret['Ij'] = round(sumIj / averaging, 4) 
         try:
-            ret['Vmag'] = round(self.unpackFloat(self.monitor(self.SIS_MAGNET_VOLTAGE + subsysOffset)), 4)
-            ret['Imag'] = round(self.unpackFloat(self.monitor(self.SIS_MAGNET_CURRENT + subsysOffset)), 4)
-        except AMBConnectionError:
             ret['Vmag'] = 0
             ret['Imag'] = 0
+            val = self.monitor(self.SIS_MAGNET_VOLTAGE + subsysOffset)
+            if val != b'\xfe':
+                ret['Vmag'] = round(self.unpackFloat(val), 4) if val != b'xfe' else 0
+            val = self.monitor(self.SIS_MAGNET_CURRENT + subsysOffset)
+            if val != b'\xfe':
+                ret['Imag'] = round(self.unpackFloat(val), 4) if val != b'xFE' else 0
+        except AMBConnectionError:
+            raise
         ret['averaging'] = averaging
         return ret
 

@@ -110,3 +110,32 @@ class test_FEMCDevice(unittest.TestCase):
         tune = self.dev.unpackU16(self.dev.monitor(self.GET_YTO_COARSE_TUNE))
         self.assertTrue(tune == 1234)
         
+    def test_getAmbsiProtocolRev(self):
+        # test that we can call AMBDevice methods on an FEMCDevice object
+        revisionStr = self.dev.getAmbsiProtocolRev()
+        self.assertIsInstance(revisionStr, str)
+        self.assertTrue(len(revisionStr) >= 5)
+        
+    def test_getAmbsiErrors(self):
+        # test that we can call AMBDevice methods on an FEMCDevice object
+        numErr, lastErr = self.dev.getAmbsiErrors()
+        self.assertIsInstance(numErr, int)
+        self.assertIsInstance(lastErr, int)
+        
+    def test_getAmbsiNumTrans(self):
+        # test that we can call AMBDevice methods on an FEMCDevice object
+        num = self.dev.getAmbsiNumTrans()
+        self.assertIsInstance(num, int)
+        self.assertTrue(num > 0)
+        
+    def test_getAmbsiTemperature(self):
+        # test that we can call AMBDevice methods on an FEMCDevice object
+        temp = self.dev.getAmbsiTemperature()
+        self.assertIsInstance(temp, float)
+        self.assertTrue(temp != 0.0)
+        
+    def test_getAmbsiSoftwareRev(self):
+        # test that we can call AMBDevice methods on an FEMCDevice object
+        revisionStr = self.dev.getAmbsiProtocolRev()
+        self.assertIsInstance(revisionStr, str)
+        self.assertTrue(len(revisionStr) >= 5)        

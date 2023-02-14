@@ -35,10 +35,45 @@ Future: **AMBConnectionNixnet** will implement the interface for National Instru
 
 Future:  Other classes could be added for other front end subsystems: Cryostat, LPR, etc.
 
+### Installation
+32-bit Python is required
+
+Install Python 3.8 32-bit or newer.  This can be done simply by downloading the [Windows installer](https://www.python.org/downloads/windows/) or if you are using something such as Anaconda follow the [directions here](https://stackoverflow.com/a/33711433) to force it to create a 32-bit environment.
+
+If you are using Anaconda/conda or venv, open a command prompt and cd to the top-level project folder ALMAFE-AMBDeviceLibrary.
+
+(CTS_32_2) L:\Python\ALMAFE-AMBDeviceLibrary>**pip install -r requirements.txt**
+
+This will install the Python packages required by the library.
+
+You will need to somehow add the root project folder to your PYTHONPATH environment variable.   Visual Studio Code does this as part of a launch configuration.   For example:
+
+### /.vscode/launch.json
+```json
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: AMBDeviceLibrary tests",
+            "type": "python",
+            "request": "launch",
+            "program": "L:\\Python\\ALMAFE-AMBDeviceLibrary\\Tests\\Unit\\main.py",
+            "console": "integratedTerminal",
+            "cwd": "L:\\Python\\ALMAFE-AMBDeviceLibrary",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${cwd}"
+            }
+        },
+    ]
+}
+```
+
+You can then connect to an FEMC module and run the unit tests /Tests/Unit/main.py.
+
 ### Usage
-See (/Examples)
-
-
-
-
+See /Examples
 

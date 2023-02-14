@@ -10,7 +10,7 @@ class test_AMBConnectionDLL(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):        
-        cls.conn = AMBConnectionDLL(channel = 0)
+        cls.conn = AMBConnectionDLL(channel = 0, dllName = 'L:\ALMA-FEControl\FrontEndAMBDLL\deploy\FrontEndAMB.dll')
         
     @classmethod
     def tearDownClass(cls):

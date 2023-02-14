@@ -10,7 +10,7 @@ class test_CCADevice(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # cls.conn = AMBConnectionNican(channel = 0, resetOnError = True)
-        cls.conn = AMBConnectionDLL(channel = 0)
+        cls.conn = AMBConnectionDLL(channel = 0, dllName = 'L:\ALMA-FEControl\FrontEndAMBDLL\deploy\FrontEndAMB.dll')
         
     @classmethod
     def tearDownClass(cls):
@@ -38,10 +38,10 @@ class test_CCADevice(unittest.TestCase):
     def test_setSISHeater(self):
         self.dev.setSISHeater(0, False)
         sleep(0.01)
-        currentOff = self.dev.getSISHeaterCurrent()
+        currentOff = self.dev.getSISHeaterCurrent(0)
         self.dev.setSISHeater(0, True)
         sleep(0.01)
-        currentOn = self.dev.getSISHeaterCurrent()
+        currentOn = self.dev.getSISHeaterCurrent(0)
         print(f"SIS heater current off={currentOff} on={currentOn}")
         self.assertGreater(currentOn, currentOff)
         self.dev.setSISHeater(0, False)

@@ -10,7 +10,7 @@ from datetime import datetime
 
 class AMBConnectionDLL(AMBConnectionItf):
 
-    def __init__(self, channel:Optional[int] = 0, dllName = r'L:\ALMA-FEControl\FrontEndControl2\FrontEndAMB.dll', logInfo = True):
+    def __init__(self, channel:Optional[int] = 0, dllName = r'FrontEndAMB.dll', logInfo = True):
         '''
         Constructor opens a connection using the FrontEndAMB.DLL                
         :param channel: typically 0..5 corresponding to CAN0..CAN5 or can be the channel number on the ABM  

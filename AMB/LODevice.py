@@ -9,6 +9,7 @@ from AMB.AMBConnectionItf import AMBConnectionItf, AMBConnectionError
 from datetime import datetime
 from typing import Optional
 from time import sleep
+from .Utility.logger import getLogger
 
 class LODevice(FEMCDevice):
 
@@ -22,25 +23,27 @@ class LODevice(FEMCDevice):
     def __init__(self, 
                  conn:AMBConnectionItf, 
                  nodeAddr:int, 
-                 band:int,                      # what band is the actual hardware
-                 femcPort:Optional[int] = None, # optional override which port the band is connected to
-                 logInfo = True):
-        super(LODevice, self).__init__(conn, nodeAddr, femcPort if femcPort else band, logInfo)
+                 band:int,                       # what band is the actual hardware
+                 femcPort:Optional[int] = None): # optional override which port the band is connected to
+        super(LODevice, self).__init__(conn, nodeAddr, femcPort if femcPort else band)
         self.band = band
+        self.logger = getLogger()
         self.ytoLowGHz = 0
         self.ytoHighGHz = 0
+        self.freqLOGHz = 0      # cache in setLOFrequency() and optionally reuse in lockPLL()
     
     def setYTOLimits(self, lowGHz:float, highGHz:float):
         self.ytoLowGHz = lowGHz
         self.ytoHighGHz = highGHz
         
-    def setLOFrequency(self, freqGHz:float):
+    def setLOFrequency(self, freqLOGHz:float):
         # avoid divide by zero
-        if freqGHz == 0:
-            self.__logMessage(f"setLOFrequency ERROR freqLOGHz={freqGHz}", True)
+        if freqLOGHz <= 0:
+            self.logger.error(f"setLOFrequency ERROR freqLOGHz={freqLOGHz}")
             return 0, 0, 0
+        self.freqLOGHz = freqLOGHz
         # frequency at the WCA outputs: 
-        wcaFreq = freqGHz / self.COLD_MULTIPLIERS[self.band]
+        wcaFreq = self.freqLOGHz / self.COLD_MULTIPLIERS[self.band]
         # YTO tuning frequency:
         ytoFreq = wcaFreq / self.WARM_MULTIPLIERS[self.band]
         ytoCourse = self.__ytoFreqToCourse(ytoFreq)
@@ -59,7 +62,7 @@ class LODevice(FEMCDevice):
     def __ytoFreqToCourse(self, ytoFreq:float):
         if not (self.ytoHighGHz > self.ytoLowGHz):
             # avoid divide by zero
-            self.__logMessage("YTO limits are not valid.  Call setYTOLimits() first.", True)
+            self.logger.error("YTO limits are not valid.  Call setYTOLimits() first.")
             return 0
         if ytoFreq < self.ytoLowGHz:
             ytoFreq = self.ytoLowGHz
@@ -67,14 +70,16 @@ class LODevice(FEMCDevice):
             ytoFreq = self.ytoHighGHz
         return int((ytoFreq - self.ytoLowGHz) / (self.ytoHighGHz - self.ytoLowGHz) * 4095)
     
-    def lockPLL(self, freqLOGHz:float, freqFloogGHz:float = 0.0315):
+    def lockPLL(self, freqLOGHz:float = None):
+        if not freqLOGHz:
+            freqLOGHz = self.freqLOGHz
         numPoints = 9
         interval = 5
-        self.__logMessage(f"lockPLL ICT_19283_LOCK_CV_Points={numPoints} interval={interval}...")
+        self.logger.info(f"lockPLL ICT_19283_LOCK_CV_Points={numPoints} interval={interval}...")
 
         wcaFreq, ytoFreq, ytoCourse = self.setLOFrequency(freqLOGHz)
         if wcaFreq == 0:
-            self.__logMessage(f"freqLOGHz:{freqLOGHz} is out of range.")
+            self.logger.error(f"freqLOGHz:{freqLOGHz} is out of range.")
             return 0, 0, 0
 
         pll = self.getLockInfo()
@@ -83,13 +88,12 @@ class LODevice(FEMCDevice):
             self.adjustPLL(0.0)
             pll = self.getLockInfo()
             if pll['isLocked']:
-                self.__logMessage("PLL is locked")
+                self.logger.info("PLL is locked")
                 return wcaFreq, ytoFreq, ytoCourse
         else:
             # search for points where lock is achieved:
             pll = self.getPLLConfig()
-            referenceFreq = wcaFreq + freqFloogGHz * (1 if pll['lockSB'] == 0 else -1)
-            self.__logMessage(f"lockPLL:points-1 first guess: ytoCourse={ytoCourse} ytoFreq={ytoFreq} referenceFreq={referenceFreq}")
+            self.logger.info(f"lockPLL:points-1 first guess: ytoCourse={ytoCourse} ytoFreq={ytoFreq}")
         
             pllVList = []
             for i in range(numPoints):
@@ -103,7 +107,7 @@ class LODevice(FEMCDevice):
                 elif thisTune < 0:
                     thisTune = 0
     
-                self.__logMessage(f"lockPLL:points-2 i={i} offset={offset} thisTune={thisTune}")
+                self.logger.info(f"lockPLL:points-2 i={i} offset={offset} thisTune={thisTune}")
     
                 # Disable the PLL and reset the integrator
                 self.setNullLoopIntegrator(True)
@@ -123,7 +127,7 @@ class LODevice(FEMCDevice):
                 # Gather data
                 pll = self.getPLL()
                 yto = self.getYTO()
-                self.__logMessage(f"lockPLL:points-3: isLocked={pll['isLocked']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
+                self.logger.info(f"lockPLL:points-3: isLocked={pll['isLocked']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
     
                 # Keep it if worth it
                 if pll['isLocked']:
@@ -146,11 +150,11 @@ class LODevice(FEMCDevice):
                 self.adjustPLL(0.0)
                 # check if still locked:
                 pll = self.getPLL()
-                self.__logMessage(f"lockPLL:points: found only one good tuning: isLocked={pll['isLocked']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
+                self.logger.info(f"lockPLL:points: found only one good tuning: isLocked={pll['isLocked']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
             
             # check for found no points:
             elif len(pllVList) == 0:
-                self.__logMessage("lockPLL:points: FAILED TO FIND AT ANY POINTS")
+                self.logger.error("lockPLL:points: FAILED TO FIND AT ANY POINTS")
                 
             else:
                 # we have found two or more locking points
@@ -173,9 +177,9 @@ class LODevice(FEMCDevice):
                     # Get the mean point
                     tuneZero = int((x0 + x1) / 2)
                     # Warn
-                    self.__logMessage(f"lockPLL:points: seems to be in simulation, set YIG coarse tune to the mean: {tuneZero}")
+                    self.logger.info(f"lockPLL:points: seems to be in simulation, set YIG coarse tune to the mean: {tuneZero}")
 
-                self.__logMessage(f"lockPLL:ponts-4: tuneZero={tuneZero} x0={x0} x1={x1} y0={y0} y1={y1} slope={slope}")
+                self.logger.info(f"lockPLL:ponts-4: tuneZero={tuneZero} x0={x0} x1={x1} y0={y0} y1={y1} slope={slope}")
 
                 # Lock at tune_zero
                 self.setYTOCourseTune(tuneZero)
@@ -187,31 +191,31 @@ class LODevice(FEMCDevice):
 
                 # check if still locked:
                 pll = self.getPLL()
-                self.__logMessage(f"lockPLL:points: lock succeeded with: isLocked={pll['isLocked']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
+                self.logger.info(f"lockPLL:points: lock succeeded with: isLocked={pll['isLocked']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
 
         pll = self.getLockInfo()            
         if pll['isLocked']:
-            self.__logMessage("PLL is locked")
+            self.logger.info("PLL is locked")
             return wcaFreq, ytoFreq, ytoCourse
         else:
-            self.__logMessage("PLL NO LOCK")
+            self.logger.error("PLL NO LOCK")
             return 0, 0, 0
 
     def adjustPLL(self, targetCV:Optional[float] = 0):
         pll = self.getLockInfo()
         yto = self.getYTO()
         if not pll['isLocked']:
-            self.__logMessage("adjustPLL ERROR: cant start search because PLL is not locked.")
+            self.logger.error("adjustPLL ERROR: cant start search because PLL is not locked.")
             return None
 
         maxDistance = 50    # steps away we are willing to search
         window = 0.25       # acceptable volts error from targetCV
         retries = 50        # max iterations
-        self.__logMessage(f"adjustPLL: targetCV={targetCV} +/- {window} V ")
+        self.logger.info(f"adjustPLL: targetCV={targetCV} +/- {window} V ")
         
         errorCV = pll['corrV'] - targetCV
         tryCourseTune = yto['courseTune']
-        self.__logMessage(f"adjustPLL CV={pll['corrV']} vError={errorCV} coarseYIG={tryCourseTune}")
+        self.logger.info(f"adjustPLL CV={pll['corrV']} vError={errorCV} coarseYIG={tryCourseTune}")
 
         hiThreshold = targetCV + window
         loThreshold = targetCV - window
@@ -221,7 +225,7 @@ class LODevice(FEMCDevice):
             self.setYTOCourseTune(tryCourseTune)
             controlHistory.append(tryCourseTune)
         else:
-            self.__logMessage(f"adjustPLL ERROR: got tryCourseTune={tryCourseTune}", True)
+            self.logger.error(f"adjustPLL ERROR: got tryCourseTune={tryCourseTune}", True)
             return None
 
         done = False
@@ -235,12 +239,12 @@ class LODevice(FEMCDevice):
             # check for oscillations:
             elif len(controlHistory) == 5 and controlHistory[0] == controlHistory[2] and controlHistory[2] == controlHistory[4]:
                 done = True
-                self.__logMessage("adjustPLL: detected oscillation.")
+                self.logger.info("adjustPLL: detected oscillation.")
             else:
                 retries -= 1
                 if retries <= 0:
                     done = True
-                    self.__logMessage("adjustPLL: too many retries.")
+                    self.logger.warning("adjustPLL: too many retries.")
                     
                 else:
                     errorCV = pll['corrV'] - targetCV
@@ -257,7 +261,7 @@ class LODevice(FEMCDevice):
     
         pll = self.getLockInfo()
         if not pll['isLocked']:
-            self.__logMessage(f"adjustPLL ERROR: band {self.band} lost the lock while adjusting the PLL.", True)
+            self.logger.error(f"adjustPLL ERROR: band {self.band} lost the lock while adjusting the PLL.", True)
             error = True
         else:
             self.clearUnlockDetect()
@@ -274,46 +278,41 @@ class LODevice(FEMCDevice):
         return self.command(self.CMD_OFFSET + self.PLL_CLEAR_UNLOCK_DETECT_LATCH, self.packBool(True))
     
     def selectLoopBW(self, select:int = LOOPBW_DEFAULT):
-        if select == self.LOOPBW_NORMAL:
-            select = 0
-        elif select == self.LOOPBW_ALT:
-            select = 1
-        else:
-            if select != self.LOOPBW_DEFAULT:
-                self.__logMessage(f"Unsupported value for selectLoopBw.  Using default for band {self.band}.", True)
+        if select == self.LOOPBW_DEFAULT:
+            select = self.DEFAULT_LOOPBW[self.band]
+        elif select not in (self.LOOPBW_NORMAL, self.LOOPBW_ALT):
+            self.logger.warning(f"Unsupported value for selectLoopBw.  Using default for band {self.band}.", True)
             select = self.DEFAULT_LOOPBW[self.band]
         return self.command(self.CMD_OFFSET + self.PLL_LOOP_BANDWIDTH_SELECT, self.packU8(select))
 
     def selectLockSideband(self, select:int = LOCK_BELOW_REF):
-        if select == self.LOCK_BELOW_REF:
-            select = 0
-        elif select == self.LOCK_ABOVE_REF:
-            select = 1
-        else:
-            self.__logMessage("Unsupported value for selectLockSideband. No change.", True)
+        if select not in (self.LOCK_BELOW_REF, self.LOCK_ABOVE_REF):
+            self.logger.warning("Unsupported value for selectLockSideband. No change.", True)
             return False
-        return self.command(self.CMD_OFFSET + self.PLL_LOCK_SIDEBAND_SELECT, self.packU8(select))
+        else:
+            return self.command(self.CMD_OFFSET + self.PLL_LOCK_SIDEBAND_SELECT, self.packU8(select))
     
     def setNullLoopIntegrator(self, enable:bool):
         return self.command(self.CMD_OFFSET + self.PLL_NULL_LOOP_INTEGRATOR, self.packBool(enable))
 
     def setPABias(self, pol:int, drainControl:float = None, gateVoltage:float = None):
         if pol < 0 or pol > 1:
-            self.__logMessage("Unsupported pol for setPABias. No change.", True)
+            self.logger.warning("Unsupported pol for setPABias. No change.", True)
             return False
         ret = True
+        offset = self.CMD_OFFSET + (self.POL1_OFFSET if pol==1 else 0)
         if drainControl is not None:
             if drainControl < 0:
                 drainControl = 0         
             elif drainControl > 2.5:
                 drainControl = 2.5  # highest possible value based on equation in FEND-40.04.03.03-007-A08-DSN
-            ret = self.command(self.CMD_OFFSET + self.PA_DRAIN_VOLTAGE + self.POL1_OFFSET if pol==1 else 0, self.packFloat(drainControl))
+            ret = self.command(offset + self.PA_DRAIN_VOLTAGE, self.packFloat(drainControl))
         if gateVoltage is not None:
             if gateVoltage < -0.84:
                 gateVoltage = -0.84 # lowest possible value based on equation in FEND-40.04.03.03-007-A08-DSN
             elif gateVoltage > 0.15:
                 gateVoltage = 0.15  # highest possible value
-            if not self.command(self.CMD_OFFSET + self.PA_GATE_VOLTAGE + self.POL1_OFFSET if pol==1 else 0, self.packFloat(gateVoltage)):
+            if not self.command(offset + self.PA_GATE_VOLTAGE, self.packFloat(gateVoltage)):
                 ret = False
         return ret 
 
@@ -326,7 +325,7 @@ class LODevice(FEMCDevice):
 
     def setTeledynePAConfig(self, hasTeledyne:bool, collectorP0:int = 0, collectorP1:int = 0):
         if self.band != 7:
-            self.__logMessage(f"Set Teledyne PA config is not supported for band {self.band}.", True)
+            self.logger.warning(f"Set Teledyne PA config is not supported for band {self.band}.", True)
             return False
         if collectorP0 < 0:
             collectorP0 = 0
@@ -373,7 +372,7 @@ class LODevice(FEMCDevice):
         ret = {'courseTune': 0, 'temperature': 0, 'nullPLL': False}
         try:
             ret['courseTune'] = self.unpackU16(self.monitor(self.YTO_COARSE_TUNE))
-            ret['temperature'] = round(self.unpackFloat(self.monitor(self.PLL_ASSEMBLY_TEMP)), 3)
+            ret['temperature'] = round(self.unpackFloat(self.monitor(self.PLL_ASSEMBLY_TEMP)), 2)
             ret['nullPLL'] = self.unpackBool(self.monitor(self.PLL_NULL_LOOP_INTEGRATOR))
         except:
             pass
@@ -396,9 +395,9 @@ class LODevice(FEMCDevice):
         try:
             info['lockDetectBit'] = self.unpackFloat(self.monitor(self.PLL_LOCK_DETECT_VOLTAGE)) >= 3.0
             info['unlockDetected'] = self.unpackBool(self.monitor(self.PLL_UNLOCK_DETECT_LATCH))
-            info['refTP'] = round(self.unpackFloat(self.monitor(self.PLL_REF_TOTAL_POWER)), 4)
-            info['IFTP'] = round(self.unpackFloat(self.monitor(self.PLL_IF_TOTAL_POWER)), 4)
-            info['corrV'] = round(self.unpackFloat(self.monitor(self.PLL_CORRECTION_VOLTAGE)), 4)
+            info['refTP'] = round(self.unpackFloat(self.monitor(self.PLL_REF_TOTAL_POWER)), 2)
+            info['IFTP'] = round(self.unpackFloat(self.monitor(self.PLL_IF_TOTAL_POWER)), 2)
+            info['corrV'] = round(self.unpackFloat(self.monitor(self.PLL_CORRECTION_VOLTAGE)), 2)
             info['isLocked'] = info['lockDetectBit'] and abs(info['refTP']) >= 0.5 and abs(info['IFTP']) >= 0.5
         except AMBConnectionError:
             pass
@@ -431,8 +430,8 @@ class LODevice(FEMCDevice):
         ret = {'enabled': False, 'voltage': 0, 'current': 0}
         try:
             ret['enabled'] = self.unpackBool(self.monitor(self.PHOTOMIXER_ENABLE))
-            ret['voltage'] = round(self.unpackFloat(self.monitor(self.PHOTOMIXER_VOLTAGE)), 4)
-            ret['current'] = round(self.unpackFloat(self.monitor(self.PHOTOMIXER_CURRENT)), 4)
+            ret['voltage'] = round(self.unpackFloat(self.monitor(self.PHOTOMIXER_VOLTAGE)), 2)
+            ret['current'] = round(self.unpackFloat(self.monitor(self.PHOTOMIXER_CURRENT)), 2)
         except AMBConnectionError:
             pass
         return ret
@@ -448,18 +447,18 @@ class LODevice(FEMCDevice):
                'VGE': 0, 'VDE': 0, 'IDE': 0, 
                'multDCounts': 0, 'multDCurrent': 0, 'supply5V': 0}
         try:
-            ret['VGA'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_A_VOLTAGE)), 4)
-            ret['VDA'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_A_VOLTAGE)), 4)
-            ret['IDA'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_A_CURRENT)), 4)
-            ret['VGB'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_B_VOLTAGE)), 4)
-            ret['VDB'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_B_VOLTAGE)), 4)
-            ret['IDB'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_B_CURRENT)), 4)
+            ret['VGA'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_A_VOLTAGE)), 2)
+            ret['VDA'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_A_VOLTAGE)), 2)
+            ret['IDA'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_A_CURRENT)), 2)
+            ret['VGB'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_B_VOLTAGE)), 2)
+            ret['VDB'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_B_VOLTAGE)), 2)
+            ret['IDB'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_B_CURRENT)), 2)
             ret['multDCounts'] = self.unpackU8(self.monitor(self.AMC_MULTIPLIER_D_COUNTS))
             ret['multDCurrent'] = round(self.unpackFloat(self.monitor(self.AMC_MULTIPLIER_D_CURRENT)), 4)
-            ret['VGE'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_E_VOLTAGE)), 4)
-            ret['VDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_VOLTAGE)), 4)
-            ret['IDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_CURRENT)), 4)
-            ret['supply5V'] = round(self.unpackFloat(self.monitor(self.AMC_SUPPLY_VOLTAGE_5V)), 4)
+            ret['VGE'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_E_VOLTAGE)), 2)
+            ret['VDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_VOLTAGE)), 2)
+            ret['IDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_CURRENT)), 2)
+            ret['supply5V'] = round(self.unpackFloat(self.monitor(self.AMC_SUPPLY_VOLTAGE_5V)), 2)
         except AMBConnectionError:
             pass
         return ret
@@ -477,14 +476,14 @@ class LODevice(FEMCDevice):
         '''
         ret = {'VGp0': 0, 'VGp1': 0, 'VDp0': 0, 'VDp1': 0, 'IDp0': 0, 'IDp1': 0, 'supply3V': 0, 'supply5V': 0}
         try:
-            ret['VGp0'] = round(self.unpackFloat(self.monitor(self.PA_GATE_VOLTAGE)), 4)
-            ret['VGp1'] = round(self.unpackFloat(self.monitor(self.PA_GATE_VOLTAGE + self.POL1_OFFSET)), 4)
-            ret['VDp0'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_VOLTAGE)), 4)
-            ret['VDp1'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_VOLTAGE + self.POL1_OFFSET)), 4)
-            ret['IDp0'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_CURRENT)), 4)
-            ret['IDp1'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_CURRENT + self.POL1_OFFSET)), 4)
-            ret['supply3V'] = round(self.unpackFloat(self.monitor(self.PA_SUPPLY_VOLTAGE_3V)), 4)
-            ret['supply5V'] = round(self.unpackFloat(self.monitor(self.PA_SUPPLY_VOLTAGE_5V)), 4)
+            ret['VGp0'] = round(self.unpackFloat(self.monitor(self.PA_GATE_VOLTAGE)), 2)
+            ret['VGp1'] = round(self.unpackFloat(self.monitor(self.PA_GATE_VOLTAGE + self.POL1_OFFSET)), 2)
+            ret['VDp0'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_VOLTAGE)), 2)
+            ret['VDp1'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_VOLTAGE + self.POL1_OFFSET)), 2)
+            ret['IDp0'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_CURRENT)), 2)
+            ret['IDp1'] = round(self.unpackFloat(self.monitor(self.PA_DRAIN_CURRENT + self.POL1_OFFSET)), 2)
+            ret['supply3V'] = round(self.unpackFloat(self.monitor(self.PA_SUPPLY_VOLTAGE_3V)), 2)
+            ret['supply5V'] = round(self.unpackFloat(self.monitor(self.PA_SUPPLY_VOLTAGE_5V)), 2)
         except AMBConnectionError:
             pass
         return ret
@@ -504,11 +503,7 @@ class LODevice(FEMCDevice):
         except AMBConnectionError:
             pass
         return ret
-    
-    def __logMessage(self, msg, alwaysLog = False):
-        if self.logInfo or alwaysLog:
-            print(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + f" LODevice band{self.band}: {msg}")
-    
+   
     # constants used internally:
     WARM_MULTIPLIERS = {
         1: 1,   # band 1

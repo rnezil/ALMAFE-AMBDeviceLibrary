@@ -7,10 +7,11 @@ FEMCDevice represents a device connected via an FEMC module.
 '''
 from AMB.AMBDevice import AMBDevice
 from AMB.AMBConnectionItf import AMBConnectionItf, AMBConnectionError
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 import struct
 from time import sleep
+from .Utility.logger import getLogger
 
 class FEMCDevice(AMBDevice):
 
@@ -39,29 +40,29 @@ class FEMCDevice(AMBDevice):
     def __init__(self, 
                  conn:AMBConnectionItf, 
                  nodeAddr:int, 
-                 femcPort:Optional[int] = PORT_FEMC_MODULE, 
-                 logInfo = True):
+                 femcPort:Optional[int] = PORT_FEMC_MODULE):
         super(FEMCDevice, self).__init__(conn, nodeAddr)
         self.femcPort = femcPort
-        self.logInfo = logInfo
         self.initialized = False
     
     def __del__(self):
         self.shutdown() 
         
-    def initSession(self, mode:Optional[int] = MODE_TROUBLESHOOTING):
-        if self.initialized:
+    def initSession(self, mode:Optional[int] = None) -> bool:
+        if self.initialized and mode is not None:
             self.self.setFeMode(mode)
             return True
         else:
             try:
-                data = self.__devMonitor(self.GET_SETUP_INFO)
+                data = super(FEMCDevice, self).monitor(self.GET_SETUP_INFO)
             except AMBConnectionError:
-                self.__logMessage('GET_SETUP_INFO exception', True)
+                self.logger.error('GET_SETUP_INFO exception')
                 return False
             if data == b'\x00' or data == b'\x05':
                 self.initialized = True
-                if self.setFeMode(mode):
+                if mode is not None:
+                    return self.setFeMode(mode)
+                else:
                     return True
             return False
 
@@ -77,14 +78,26 @@ class FEMCDevice(AMBDevice):
         self.initialized = False
         super(FEMCDevice, self).shutdown()
        
-    def getFemcVersion(self):
-        try:
-            data = self.__devMonitor(self.GET_VERSION_INFO)
+    def getFemcVersion(self) -> str:
+        data = self.__devMonitor(self.GET_VERSION_INFO)
+        if data:
             return f"{data[0]}.{data[1]}.{data[2]}"
-        except AMBConnectionError:
+        else:
             return "0.0.0"
+        
+    def isFemcVersionAtLeast(self, needVersion) -> bool:
+        data = self.__devMonitor(self.GET_VERSION_INFO)
+        needVersion = needVersion.split('.')
+        if data[0] < int(needVersion[0]):
+            return False
+        if data[1] < int(needVersion[1]):
+            return False
+        if data[2] < int(needVersion[2]):
+            return False
+        return True
+        
 
-    def setFeMode(self, mode:int):
+    def setFeMode(self, mode:int) -> bool:
         if mode == self.MODE_OPERATIONAL:
             data = b'\x00'
         elif mode == self.MODE_TROUBLESHOOTING:
@@ -94,26 +107,23 @@ class FEMCDevice(AMBDevice):
         elif mode == self.MODE_SIMULATE:
             data = b'\x03'
         else:
-            self.__logMessage(f"setFeMode bad mode: {mode}", True)
+            self.logger.warning(f"setFeMode unsupported mode: {mode}", True)
             return False
         return self.__devCommand(self.SET_FE_MODE, data)
 
-    def getFeMode(self):
-        try:
-            data = self.__devMonitor(self.GET_FE_MODE)
+    def getFeMode(self) -> int:
+        data = self.__devMonitor(self.GET_FE_MODE)
+        if data:
             return data[0]
-        except AMBConnectionError:
+        else:
             return -1
 
-    def getEsnList(self, reload = False):
+    def getEsnList(self, reload = False) -> List[bytes]:
         if reload:
             self.__devCommand(self.SET_READ_ESN, b'\x01')
             sleep(0.2)
-        try:
-            data = self.__devMonitor(self.GET_ESNS_FOUND)
-            if not data:
-                return []
-        except AMBConnectionError:
+        data = self.__devMonitor(self.GET_ESNS_FOUND)
+        if not data:
             return []
         ret = []
         for _ in range(data[0]):
@@ -122,7 +132,7 @@ class FEMCDevice(AMBDevice):
                 ret.append(data)
         return ret
 
-    def getEsnString(self):
+    def getEsnString(self) -> str:
         data = self.getEsnList()
         ret = ""
         if data:
@@ -130,24 +140,23 @@ class FEMCDevice(AMBDevice):
                 ret += f"{esn[0]:02X} {esn[1]:02X} {esn[2]:02X} {esn[3]:02X} {esn[4]:02X} {esn[5]:02X} {esn[6]:02X} {esn[7]:02X}\n"
         return ret
             
-    def setBandPower(self, band:int, enable:bool = True):
+    def setBandPower(self, band:int, enable:bool = True) -> bool:
         if band < self.PORT_BAND1 or band > self.PORT_BAND10:
-            self.__logMessage(f"initBand bad band number: {band}", True)
+            self.logger.error(f"setBandPower bad band number: {band}", True)
             return False
         rca = self.SET_CART_POWER + ((band - 1) << 4)
         data = b'\x01' if enable else b'\x00'
-        ret = self.__devCommand(rca, data)
-        return ret
+        return self.__devCommand(rca, data)
     
     def setAllBandsOff(self):
         for band in range(10):
             self.setBandPower(band + 1, False)
 
-    def getNumBandsPowered(self):
-        try:
-            data = self.__devMonitor(self.GET_NUM_BANDS_POWERED)
+    def getNumBandsPowered(self) -> int:
+        data = self.__devMonitor(self.GET_NUM_BANDS_POWERED)
+        if data:
             return data[0]
-        except AMBConnectionError:
+        else:
             return -1
 
     def monitor(self, rca:int):
@@ -250,15 +259,17 @@ class FEMCDevice(AMBDevice):
         struct.pack_into('!f', data, offset, float(val))
         return bytes(data)
 
-    def __devMonitor(self, rca:int):
-        return super(FEMCDevice, self).monitor(rca)
-
+    def __devMonitor(self, rca:int) -> Optional[bytes]:
+        if self.initialized:
+            return super(FEMCDevice, self).monitor(rca)
+        else:
+            return None
+    
     def __devCommand(self, rca:int, data:bytes):
-        return super(FEMCDevice, self).command(rca, data)
-
-    def __logMessage(self, msg, alwaysLog = False):
-        if self.logInfo or alwaysLog:
-            print(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " FEMCDevice: " + msg)
+        if self.initialized:
+            return super(FEMCDevice, self).command(rca, data)
+        else:
+            return False
 
     # RCAs used internally
     GET_AMBSI_VERSION_INFO  = 0x20000   # get the version info for the AMBSI firmware

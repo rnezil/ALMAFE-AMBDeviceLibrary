@@ -4,26 +4,29 @@ from AMB.AMBConnectionDLL import AMBConnectionDLL
 from AMB.FEMCDevice import FEMCDevice
 from AMB.CCADevice import CCADevice
 from time import sleep
+import configparser
 
 class test_CCADevice(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # cls.conn = AMBConnectionNican(channel = 0, resetOnError = True)
-        cls.conn = AMBConnectionDLL(channel = 0, dllName = 'L:\ALMA-FEControl\FrontEndAMBDLL\deploy\FrontEndAMB.dll')
+        config = configparser.ConfigParser()
+        config.read('FrontEndAMBDLL.ini')
+        dllName = config['load']['dll']
+        cls.conn = AMBConnectionDLL(channel = 0, dllName = dllName)
         
     @classmethod
     def tearDownClass(cls):
         cls.conn.shutdown()
         
     def setUp(self):
-        self.dev = CCADevice(self.conn, 0x13, FEMCDevice.PORT_BAND7)
-        self.dev.initSession(FEMCDevice.MODE_SIMULATE)
-        self.dev.setBandPower(FEMCDevice.PORT_BAND7, True)
+        self.dev = CCADevice(self.conn, 0x13, FEMCDevice.PORT_BAND6)
+        self.dev.initSession()
+        self.dev.setBandPower(FEMCDevice.PORT_BAND6, True)
         sleep(0.2)
         
     def tearDown(self):
-        self.dev.setBandPower(FEMCDevice.PORT_BAND7, False)
+        self.dev.setBandPower(FEMCDevice.PORT_BAND6, False)
         self.dev.shutdown()
         
     def test_setSIS(self):

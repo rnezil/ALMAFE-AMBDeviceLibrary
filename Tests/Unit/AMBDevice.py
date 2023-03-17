@@ -2,8 +2,10 @@ import unittest
 from AMB.AMBConnectionDLL import AMBConnectionDLL
 from AMB.AMBConnectionNican import AMBConnectionNican
 from AMB.AMBDevice import AMBDevice
+import configparser
 
 class t_AMBDevice(unittest.TestCase):
+    GET_FEMC_VERSION        = 0x20002
     GET_FE_MODE             = 0x2000E    
     SET_FE_MODE             = 0x2100E
     GET_AMBSI_PROTOCOL_REV  = 0x30000
@@ -26,10 +28,19 @@ class t_AMBDevice(unittest.TestCase):
         self.dev.command(self.SET_FE_MODE, b'\x01')
         mode = self.dev.monitor(self.GET_FE_MODE)
         self.assertTrue(mode == b'\x01', "SET_FE_MODE failed")
-        # not testing x02 because that starts the FTP server in FEMC >= 3.5
-        self.dev.command(self.SET_FE_MODE, b'\x03')
-        mode = self.dev.monitor(self.GET_FE_MODE)
-        self.assertTrue(mode == b'\x03', "SET_FE_MODE failed")
+
+        # not testing FE_MODE=2 because that starts the FTP server in FEMC >= 3.5
+        
+        # check for firmware version which supports FE_MODE=3:
+        version = self.dev.monitor(self.GET_FEMC_VERSION)
+        self.assertTrue(len(version) == 3)
+        if version[0] >= 3 and version[1] >= 6 and version[2] >= 3:
+            # test FE_MODE=3:
+            self.dev.command(self.SET_FE_MODE, b'\x03')
+            mode = self.dev.monitor(self.GET_FE_MODE)
+            self.assertTrue(mode == b'\x03', "SET_FE_MODE failed")
+
+        #restore previous mode:
         self.dev.command(self.SET_FE_MODE, prevMode)
         mode = self.dev.monitor(self.GET_FE_MODE)
         self.assertTrue(mode == prevMode, "SET_FE_MODE failed")
@@ -114,7 +125,10 @@ class test_AMBDeviceDLL(t_AMBDevice):
     
     @classmethod
     def setUpClass(cls):
-        cls.conn = AMBConnectionDLL(channel = 0, dllName = 'L:\ALMA-FEControl\FrontEndAMBDLL\deploy\FrontEndAMB.dll')
+        config = configparser.ConfigParser()
+        config.read('FrontEndAMBDLL.ini')
+        dllName = config['load']['dll']
+        cls.conn = AMBConnectionDLL(channel = 0, dllName = dllName)
         
     @classmethod
     def tearDownClass(cls):

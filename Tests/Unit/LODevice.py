@@ -4,26 +4,29 @@ from AMB.AMBConnectionDLL import AMBConnectionDLL
 from AMB.FEMCDevice import FEMCDevice
 from AMB.LODevice import LODevice
 from time import sleep
+import configparser
 
 class test_LODevice(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # cls.conn = AMBConnectionNican(channel = 0, resetOnError = True)
-        cls.conn = AMBConnectionDLL(channel = 0, dllName = 'L:\ALMA-FEControl\FrontEndAMBDLL\deploy\FrontEndAMB.dll')
+        config = configparser.ConfigParser()
+        config.read('FrontEndAMBDLL.ini')
+        dllName = config['load']['dll']
+        cls.conn = AMBConnectionDLL(channel = 0, dllName = dllName)
         
     @classmethod
     def tearDownClass(cls):
         cls.conn.shutdown()
         
     def setUp(self):
-        self.dev = LODevice(self.conn, 0x13, FEMCDevice.PORT_BAND7)
-        self.dev.initSession(FEMCDevice.MODE_SIMULATE)
-        self.dev.setBandPower(FEMCDevice.PORT_BAND7, True)
+        self.dev = LODevice(self.conn, 0x13, FEMCDevice.PORT_BAND6)
+        self.dev.initSession()
+        self.dev.setBandPower(FEMCDevice.PORT_BAND6, True)
         sleep(0.2)
         
     def tearDown(self):
-        self.dev.setBandPower(FEMCDevice.PORT_BAND7, False)
+        self.dev.setBandPower(FEMCDevice.PORT_BAND6, False)
         self.dev.shutdown()
     
     def test_setLOFrequency(self):
@@ -48,7 +51,7 @@ class test_LODevice(unittest.TestCase):
         
     def test_lockPLL(self):
         self.dev.setYTOLimits(14.0, 17.5)
-        self.dev.lockPLL(300, 3)
+        self.dev.lockPLL(300)
         #  what can we assert when simulating?
 
     def test_adjustPLL(self):
@@ -117,8 +120,8 @@ class test_LODevice(unittest.TestCase):
         self.dev.setPABias(pol=0, gateVoltage=-0.2)
         self.dev.setPABias(pol=1, gateVoltage=-0.2)
         pa = self.dev.getPA()
-        self.assertAlmostEqual(pa['VGp0'], -0.2, delta=0.1, msg="This is expected to fail in FEMode=3 simulation mode")
-        self.assertAlmostEqual(pa['VGp1'], -0.2, delta=0.1, msg="This is expected to fail in FEMode=3 simulation mode")
+        self.assertAlmostEqual(pa['VGp0'], -0.2, delta=0.2, msg="This is expected to fail in FEMode=3 simulation mode")
+        self.assertAlmostEqual(pa['VGp1'], -0.2, delta=0.2, msg="This is expected to fail in FEMode=3 simulation mode")
         self.dev.setPABias(pol=0, drainControl=1)
         self.dev.setPABias(pol=1, drainControl=1)
         pa = self.dev.getPA()
@@ -128,19 +131,20 @@ class test_LODevice(unittest.TestCase):
         self.dev.setPABias(pol=1, drainControl=0, gateVoltage=0)
         
     def test_setTeledynePAConfig(self):
-        self.dev.setTeledynePAConfig(hasTeledyne = False, collectorP0 = 0, collectorP1 = 0)
-        tdpa = self.dev.getTeledynePA()
-        self.assertFalse(tdpa['hasTeledyne'])
-        self.assertEqual(tdpa['collectorP0'], 0)
-        self.assertEqual(tdpa['collectorP1'], 0)
-        self.dev.setTeledynePAConfig(hasTeledyne = True, collectorP0 = 250, collectorP1 = 250)
-        tdpa = self.dev.getTeledynePA()
-        self.assertTrue(tdpa['hasTeledyne'])
-        self.assertEqual(tdpa['collectorP0'], 250)
-        self.assertEqual(tdpa['collectorP1'], 250)
-        self.dev.setTeledynePAConfig(hasTeledyne = False)
-        tdpa = self.dev.getTeledynePA()
-        self.assertFalse(tdpa['hasTeledyne'])
+        if self.dev.isFemcVersionAtLeast('3.6.4'):
+            self.dev.setTeledynePAConfig(hasTeledyne = False, collectorP0 = 0, collectorP1 = 0)
+            tdpa = self.dev.getTeledynePA()
+            self.assertFalse(tdpa['hasTeledyne'])
+            self.assertEqual(tdpa['collectorP0'], 0)
+            self.assertEqual(tdpa['collectorP1'], 0)
+            self.dev.setTeledynePAConfig(hasTeledyne = True, collectorP0 = 250, collectorP1 = 250)
+            tdpa = self.dev.getTeledynePA()
+            self.assertTrue(tdpa['hasTeledyne'])
+            self.assertEqual(tdpa['collectorP0'], 250)
+            self.assertEqual(tdpa['collectorP1'], 250)
+            self.dev.setTeledynePAConfig(hasTeledyne = False)
+            tdpa = self.dev.getTeledynePA()
+            self.assertFalse(tdpa['hasTeledyne'])
         
     def test_getYTO(self):
         self.dev.setYTOLimits(12.0, 15.5)

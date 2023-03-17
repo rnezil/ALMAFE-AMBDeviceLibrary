@@ -7,7 +7,7 @@ AMBDevice represents the lowest-level CAN bus device.
 '''
 
 from AMB.AMBConnectionItf import AMBConnectionItf, AMBConnectionError
-from typing import Optional
+from typing import Optional, Tuple
 
 class AMBDevice():
     
@@ -31,21 +31,21 @@ class AMBDevice():
         self.conn = None
         self.nodeAddr = None
     
-    def command(self, rca, data):
-        return self.conn.command(self.nodeAddr, rca, data)
+    def command(self, RCA:int, data:bytes) -> bool:
+        return self.conn.command(self.nodeAddr, RCA, data)
         
-    def monitor(self, rca):
-        return self.conn.monitor(self.nodeAddr, rca)
+    def monitor(self, RCA) -> Optional[bytes]:
+        return self.conn.monitor(self.nodeAddr, RCA)
     
-    def getAmbsiProtocolRev(self):
-        try:
-            # we don't want to call the overridden monitor() method:
-            data = AMBDevice.monitor(self, self.GET_AMBSI_PROTOCOL_REV)
+    def getAmbsiProtocolRev(self) -> str:
+        # we don't want to call the overridden monitor() method:
+        data = AMBDevice.monitor(self, self.GET_AMBSI_PROTOCOL_REV)
+        if data:
             return f"{data[0]}.{data[1]}.{data[2]}"
-        except AMBConnectionError:
+        else:
             return "0.0.0"
             
-    def getAmbsiErrors(self):
+    def getAmbsiErrors(self) -> Tuple[int, int]:
         try:
             # we don't want to call the overridden monitor() method:
             data = AMBDevice.monitor(self, self.GET_AMBSI_ERRORS)
@@ -55,7 +55,7 @@ class AMBDevice():
         except AMBConnectionError:
             return 0, 0
 
-    def getAmbsiNumTrans(self):
+    def getAmbsiNumTrans(self) -> int:
         try:
             # we don't want to call the overridden monitor() method:
             data = AMBDevice.monitor(self, self.GET_AMBSI_NUM_TRANS)
@@ -64,7 +64,7 @@ class AMBDevice():
         except AMBConnectionError:
             return 0
 
-    def getAmbsiTemperature(self):
+    def getAmbsiTemperature(self) -> float:
         try:
             # we don't want to call the overridden monitor() method:
             data = AMBDevice.monitor(self, self.GET_AMBSI_TEMPERATURE)
@@ -78,12 +78,10 @@ class AMBDevice():
         except AMBConnectionError:
             return 0.0
         
-    def getAmbsiSoftwareRev(self):
+    def getAmbsiSoftwareRev(self) -> str:
         try:
             # we don't want to call the overridden monitor() method:
             data = AMBDevice.monitor(self, self.GET_AMBSI_SOFTWARE_REV)
             return f"{data[0]}.{data[1]}.{data[2]}"
         except AMBConnectionError:
             return "0.0.0"
-
-        

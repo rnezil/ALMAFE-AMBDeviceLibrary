@@ -7,25 +7,31 @@ Implements bare CAN bus monitor, control, and node search.
 '''
 
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 class BusNode(BaseModel):
+    """A CAN bus node on a given AMBConnection, identified by it's node address.    
+    """
     address:int             # node address in 0..0xFF
     serialNum:bytes         # node serial number 8 bytes
 
-class AMBMessage():
-    def __init__(self, RCA: int, data:bytes, timestamp:int = 0):
-        self.RCA = RCA
-        self.data = data
-        self.timestamp = timestamp
+class AMBMessage(BaseModel):
+    """A CAN message
+    """
+    RCA: int
+    data: bytes
+    timestamp: int = 0
 
 class AMBConnectionError(Exception):
+    """Our own exception type for connection and communication errors."""
     def __init__(self, *args):
         super(AMBConnectionError, self).__init__(*args)
 
 class AMBConnectionItf(ABC):
-
+    """Abstract interface for AMBConnection*
+    Derived classes will implement these methods in terms of CAN, DLL, socket, etc.
+    """
     @abstractmethod
     def setTimeout(self, timeoutMs):
         '''
@@ -42,15 +48,15 @@ class AMBConnectionItf(ABC):
         pass
     
     @abstractmethod
-    def findNodes(self):
+    def findNodes(self) -> List[BusNode]:
         '''
         Send a broadcast request to get all CAN nodes on the bus
-        :return list of AMBConnectionItf.BusNode
+        :return list of BusNode
         '''
         pass
         
     @abstractmethod
-    def command(self, nodeAddr:int, RCA:int, data:bytes):
+    def command(self, nodeAddr:int, RCA:int, data:bytes) -> bool:
         '''
         Send a command. No response is expected.
         :param nodeAddr destination node for the command
@@ -61,15 +67,21 @@ class AMBConnectionItf(ABC):
         pass
 
     @abstractmethod
-    def monitor(self, nodeAddr:int, RCA:int):
+    def monitor(self, nodeAddr:int, RCA:int) -> Optional[bytes]:
         '''
         Send a monitor request and wait for the response.
         :param nodeAddr: destination node for the request
         :param RCA: relative CAN address
-        :return data:bytes: 1-8 byte response payload
+        :return data:bytes: 1-8 byte response payload or None
         ''' 
         pass
     
     @abstractmethod
-    def runSequence(self, nodeAddr:int, sequence:List[AMBMessage]):
+    def runSequence(self, nodeAddr:int, sequence:List[AMBMessage]) -> List[AMBMessage]:
+        """Process a sequence of monitor and command messages.
+        Monitor reesponse data shall be populated in-place in the 'sequence'
+
+        :param int nodeAddr: for which device?
+        :param List[AMBMessage] sequence: list of messages to process.
+        """
         pass

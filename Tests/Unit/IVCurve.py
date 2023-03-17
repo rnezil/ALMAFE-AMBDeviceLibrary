@@ -3,38 +3,39 @@ from AMB.AMBConnectionDLL import AMBConnectionDLL
 from AMB.CCADevice import CCADevice
 from time import time, sleep
 import plotly.graph_objects as go
+import configparser
 
 class test_IVCurve(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # cls.conn = AMBConnectionNican(channel = 0, resetOnError = True)
-        cls.conn = AMBConnectionDLL(channel = 0, dllName = 'L:\ALMA-FEControl\FrontEndAMBDLL\deploy\FrontEndAMB.dll')
-        
+        config = configparser.ConfigParser()
+        config.read('FrontEndAMBDLL.ini')
+        dllName = config['load']['dll']
+        cls.conn = AMBConnectionDLL(channel = 0, dllName = dllName)
+
     @classmethod
     def tearDownClass(cls):
         cls.conn.shutdown()
         
     def setUp(self):
-        self.dev = CCADevice(self.conn, 0x13, CCADevice.PORT_BAND7)
-        self.dev.initSession(CCADevice.MODE_SIMULATE)
-        self.dev.setBandPower(CCADevice.PORT_BAND7, True)
+        self.dev = CCADevice(self.conn, 0x13, CCADevice.PORT_BAND6)
+        self.dev.initSession()
+        self.dev.setBandPower(CCADevice.PORT_BAND6, True)
         sleep(0.2)
         
     def tearDown(self):
-        self.dev.setBandPower(CCADevice.PORT_BAND7, False)
+        self.dev.setBandPower(CCADevice.PORT_BAND6, False)
         self.dev.shutdown()
         
     def test_setIVCurve(self):
         start = time()
         VjSet, VjRead, IjRead = self.dev.IVCurve(0, 1)
         end = time()
-        print(end - start)
+        print(f"I-V Curve took {end - start} seconds")
         
         fig = go.Figure()
         lines = dict(color='blue', width=1)
-        fig.add_trace(go.Scatter(x = VjSet[:-1], y = IjRead[:-1], mode = 'lines', line = lines, name="Ij"))
-        # lines['color'] = 'red'
-        # fig.add_trace(go.Scatter(x = VjSet, y = VjRead, mode = 'lines', line = lines, name="Vj"))
+        fig.add_trace(go.Scatter(x = VjSet, y = IjRead, mode = 'lines', line = lines, name="Ij"))
         fig.show()
         

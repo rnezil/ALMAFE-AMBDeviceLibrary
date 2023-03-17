@@ -1,5 +1,5 @@
 '''
-cross-platform force unlode ctypes shared library / DLL
+cross-platform force unload ctypes shared library / DLL
 from https://github.com/bwoodsend/cslug/blob/main/cslug/_stdlib.py
 and https://stackoverflow.com/questions/359498/how-can-i-unload-a-dll-using-ctypes-in-python
 '''

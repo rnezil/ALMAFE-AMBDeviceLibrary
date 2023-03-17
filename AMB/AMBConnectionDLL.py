@@ -4,27 +4,28 @@ AmbConnection implemented via the C++/Windows FrontEndAMB.dll
 from typing import Optional, List
 from .AMBConnectionItf import AMBConnectionItf, AMBConnectionError, BusNode, AMBMessage
 from .Utility import DLLClose
+from .Utility.logger import getLogger
 import ctypes
 from copy import copy
 from datetime import datetime
 
 class AMBConnectionDLL(AMBConnectionItf):
 
-    def __init__(self, channel:Optional[int] = 0, dllName = r'FrontEndAMB.dll', logInfo = True):
+    def __init__(self, channel:Optional[int] = 0, dllName = r'FrontEndAMB.dll'):
         '''
         Constructor opens a connection using the FrontEndAMB.DLL                
         :param channel: typically 0..5 corresponding to CAN0..CAN5 or can be the channel number on the ABM  
         :param dllName: path to the FrontEndAMB.dll.  
                         Can be just 'FrontEndAMB.dll' if it is on the system path or './FrontEndAMB.dll' if it is in the current dir
-        :param logInfo: if True, print diagnostic messages to the console
         '''
         self.channel = channel
-        self.logInfo = logInfo
+        self.logger = getLogger()
         self.dll = ctypes.CDLL(dllName)
         ret = self.dll.initialize()
         if ret != 0:
             self.shutdown()
             raise AMBConnectionError(f"AMBConnectionDLL '{dllName}' initialize failed.")
+        self.logger.debug(f"AMBConnectionDLL connected using {dllName} to channel {channel}")
               
     def __del__(self):
         self.shutdown()
@@ -33,6 +34,7 @@ class AMBConnectionDLL(AMBConnectionItf):
         '''
         Close connection
         '''
+        self.logger.debug("AMBConnectionDLL shutdown...")
         try:
             if self.dll:
                 self.dll.shutdown()
@@ -49,10 +51,10 @@ class AMBConnectionDLL(AMBConnectionItf):
         '''
         self.dll.setTimeout(ctypes.c_ulong(timeoutMs))
         
-    def findNodes(self):
+    def findNodes(self) -> List[BusNode]:
         '''
         Send a broadcast request to get all CAN nodes on the bus
-        :return list of AMBConnectionItf.BusNode
+        :return list of BusNode
         
         int findNodes(unsigned short *numFound, unsigned char *nodeAddrs, unsigned char **serialNums, unsigned short maxLen);
         '''
@@ -71,7 +73,7 @@ class AMBConnectionDLL(AMBConnectionItf):
         else:
             return []
         
-    def command(self, nodeAddr:int, RCA:int, data:bytes):
+    def command(self, nodeAddr:int, RCA:int, data:bytes) -> bool:
         '''
         Send a command. No response is expected.
         :param nodeAddr destination node for the command
@@ -90,7 +92,7 @@ class AMBConnectionDLL(AMBConnectionItf):
         ret = self.dll.command(r1, r2, r3, r4)
         return ret == 0
         
-    def monitor(self, nodeAddr:int, RCA:int):
+    def monitor(self, nodeAddr:int, RCA:int) -> Optional[bytes]:
         '''
         Send a monitor request and wait for the response.
         :param nodeAddr: destination node for the request
@@ -111,9 +113,12 @@ class AMBConnectionDLL(AMBConnectionItf):
             response = bytes(data[:dataLen.value])
             return response
         else:
-            raise AMBConnectionError(f"monitor nodeAddr={nodeAddr} RCA={RCA:X} returned {ret}")
-
+            self.logger.error(f"monitor nodeAddr={nodeAddr} RCA={RCA:X} returned {ret}")
+            return None
+            
     class MessageStruct(ctypes.Structure):
+        """data structure for passing messages to and from the DLL
+        """
         _fields_ = [
             ("RCA", ctypes.c_ulong),
             ("dataLength", ctypes.c_ushort),
@@ -121,7 +126,14 @@ class AMBConnectionDLL(AMBConnectionItf):
             ("timestamp", ctypes.c_ulonglong)
         ]
     
-    def runSequence(self, nodeAddr:int, sequence:List[AMBMessage]):
+    def runSequence(self, nodeAddr:int, sequence:List[AMBMessage]) -> List[AMBMessage]:
+        """Process a sequence of monitor and command messages.
+        Monitor reesponse data shall be populated in-place in the 'sequence'
+
+        :param int nodeAddr: for which device?
+        :param List[AMBMessage] sequence: list of messages to process.
+        :return List[AMBMessage] all the messages from 'sequence', with monitor data responses filled in.
+        """
         contents = [
             self.MessageStruct(
                 msg.RCA, 
@@ -137,12 +149,9 @@ class AMBConnectionDLL(AMBConnectionItf):
         if not ret == 0:
             raise AMBConnectionError(f"runSequence returned {ret}")
         else:
-            ret = []
-            for r in seq:
-                msg = AMBMessage(r.RCA, ctypes.string_at(r.data, r.dataLength), r.timestamp)
-                ret.append(msg)
-            return ret
+            return [AMBMessage(
+                        RCA = r.RCA, 
+                        data = ctypes.string_at(r.data, r.dataLength), 
+                        timestamp = r.timestamp
+                    ) for r in seq]
 
-    def __logMessage(self, msg, alwaysLog = False):
-        if self.logInfo or alwaysLog:
-            print(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " AMBConnectionDLL: " + msg)        

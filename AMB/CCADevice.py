@@ -10,17 +10,18 @@ from AMB.AMBConnectionItf import AMBConnectionItf, AMBMessage, AMBConnectionErro
 from datetime import datetime
 from typing import Optional
 from time import sleep
+from .Utility.logger import getLogger
 
 class CCADevice(FEMCDevice):
     
     def __init__(self, 
                  conn:AMBConnectionItf, 
                  nodeAddr:int, 
-                 band:int,                      # what band is the actual hardware
-                 femcPort:Optional[int] = None, # optional override which port the band is connected to
-                 logInfo = True):
-        super(CCADevice, self).__init__(conn, nodeAddr, femcPort if femcPort else band, logInfo)
+                 band:int,                        # what band is the actual hardware
+                 femcPort:Optional[int] = None):  # optional override which port the band is connected to
+        super(CCADevice, self).__init__(conn, nodeAddr, femcPort if femcPort else band)
         self.band = band
+        self.logger = getLogger()
         
     def setSIS(self, pol:int, sis:int, Vj:float = None, Imag:float = None):
         '''
@@ -100,30 +101,30 @@ class CCADevice(FEMCDevice):
         if VD1 is not None:
             self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset, self.packFloat(VD1))
         if VD2 is not None:
-            self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset, self.packFloat(VD2))
+            self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset + self.LNA_STAGE_OFFSET, self.packFloat(VD2))
         if VD3 is not None:
-            self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset, self.packFloat(VD3))
+            self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset + 2 * self.LNA_STAGE_OFFSET, self.packFloat(VD3))
         if ID1 is not None:
             self.command(self.CMD_OFFSET + self.LNA_DRAIN_CURRENT + subsysOffset, self.packFloat(ID1))
         if ID2 is not None:
-            self.command(self.CMD_OFFSET + self.LNA_DRAIN_CURRENT + subsysOffset, self.packFloat(ID2))
+            self.command(self.CMD_OFFSET + self.LNA_DRAIN_CURRENT + subsysOffset + self.LNA_STAGE_OFFSET, self.packFloat(ID2))
         if ID3 is not None:
-            self.command(self.CMD_OFFSET + self.LNA_DRAIN_CURRENT + subsysOffset, self.packFloat(ID3))
+            self.command(self.CMD_OFFSET + self.LNA_DRAIN_CURRENT + subsysOffset + 2 * self.LNA_STAGE_OFFSET, self.packFloat(ID3))
         if self.band in (1, 2):
             # map stage 4,5,6 to lna2 stage 1,2,3
             subsysOffset += self.DEVICE2_OFFSET
             if VD4 is not None:
                 self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset, self.packFloat(VD4))
             if VD5 is not None:
-                self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset, self.packFloat(VD5))
+                self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset + self.LNA_STAGE_OFFSET, self.packFloat(VD5))
             if VD6 is not None:
-                self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset, self.packFloat(VD6))
+                self.command(self.CMD_OFFSET + self.LNA_DRAIN_VOLTAGE + subsysOffset + 2 * self.LNA_STAGE_OFFSET, self.packFloat(VD6))
             if ID4 is not None:
                 self.command(self.CMD_OFFSET + self.LNA_DRAIN_CURRENT + subsysOffset, self.packFloat(ID4))
             if ID5 is not None:
-                self.command(self.CMD_OFFSET + self.LNA_DRAIN_CURRENT + subsysOffset, self.packFloat(ID5))
+                self.command(self.CMD_OFFSET + self.LNA_DRAIN_CURRENT + subsysOffset + self.LNA_STAGE_OFFSET, self.packFloat(ID5))
             if ID6 is not None:
-                self.command(self.CMD_OFFSET + self.LNA_DRAIN_CURRENT + subsysOffset, self.packFloat(ID6))
+                self.command(self.CMD_OFFSET + self.LNA_DRAIN_CURRENT + subsysOffset + 2 * self.LNA_STAGE_OFFSET, self.packFloat(ID6))
         return True
         
     def setLNALEDEnable(self, pol:int, enable:bool):
@@ -144,7 +145,7 @@ class CCADevice(FEMCDevice):
         ret = {}
         for i in range(6):
             try:
-                ret[f"temp{i}"] = round(self.unpackFloat(self.monitor(self.CARTRIDGE_TEMP + (i * self.CARTRIDGE_TEMP_OFFSET))), 4)
+                ret[f"temp{i}"] = round(self.unpackFloat(self.monitor(self.CARTRIDGE_TEMP + (i * self.CARTRIDGE_TEMP_OFFSET))), 2)
             except AMBConnectionError:
                 ret[f"temp{i}"] = 0.0
         return ret
@@ -176,17 +177,17 @@ class CCADevice(FEMCDevice):
             pass
         ret = {}
         
-        ret['Vj'] = round(sumVj / averaging, 4)  
-        ret['Ij'] = round(sumIj / averaging, 4) 
+        ret['Vj'] = round(sumVj / averaging, 2)  
+        ret['Ij'] = round(sumIj / averaging, 2) 
         try:
             ret['Vmag'] = 0
             ret['Imag'] = 0
             val = self.monitor(self.SIS_MAGNET_VOLTAGE + subsysOffset)
             if val != b'\xfe':
-                ret['Vmag'] = round(self.unpackFloat(val), 4) if val != b'xfe' else 0
+                ret['Vmag'] = round(self.unpackFloat(val), 3) if val != b'xfe' else 0
             val = self.monitor(self.SIS_MAGNET_CURRENT + subsysOffset)
             if val != b'\xfe':
-                ret['Imag'] = round(self.unpackFloat(val), 4) if val != b'xFE' else 0
+                ret['Imag'] = round(self.unpackFloat(val), 3) if val != b'xFE' else 0
         except AMBConnectionError:
             raise
         ret['averaging'] = averaging
@@ -245,9 +246,9 @@ class CCADevice(FEMCDevice):
         for stage in range(3):
             try:
                 stageOffset = stage * self.LNA_STAGE_OFFSET
-                ret[f"VD{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + stageOffset)), 4)
-                ret[f"ID{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + stageOffset)), 4)
-                ret[f"VG{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + stageOffset)), 4)
+                ret[f"VD{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + stageOffset)), 2)
+                ret[f"ID{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + stageOffset)), 2)
+                ret[f"VG{stage + 1}"] = round(self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + stageOffset)), 2)
             except AMBConnectionError:
                 ret[f"VD{stage + 1}"] = 0
                 ret[f"ID{stage + 1}"] = 0
@@ -256,9 +257,9 @@ class CCADevice(FEMCDevice):
             if self.band in (1, 2):
                 # for bands 1 and 2 we return VD4...VD6 etc. by mapping to stages 1-3 of sb2
                 try:
-                    ret[f"VD{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
-                    ret[f"ID{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
-                    ret[f"VG{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 4)
+                    ret[f"VD{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 2)
+                    ret[f"ID{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_DRAIN_CURRENT + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 2)
+                    ret[f"VG{stage + 4}"] = round(self.unpackFloat(self.monitor(self.LNA_GATE_VOLTAGE + subsysOffset + self.DEVICE2_OFFSET + stageOffset)), 2)
                 except AMBConnectionError:
                     ret[f"VD{stage + 4}"] = 0
                     ret[f"ID{stage + 4}"] = 0
@@ -271,7 +272,7 @@ class CCADevice(FEMCDevice):
         :return float
         '''
         try:
-            return round(self.unpackFloat(self.monitor(self.SIS_HEATER_CURRENT + pol * self.POL1_OFFSET)), 4)
+            return round(self.unpackFloat(self.monitor(self.SIS_HEATER_CURRENT + pol * self.POL1_OFFSET)), 2)
         except AMBConnectionError:
             return 0
 
@@ -302,11 +303,11 @@ class CCADevice(FEMCDevice):
         # prevent divide by zero:
         VjRange = VjHigh - VjLow
         if VjRange == 0:
-            self.__logMessage(f"{VjLow} == {VjHigh} would divide by zero.")
+            self.logger.error(f"CCADevice({self.band}): {VjLow} == {VjHigh} would divide by zero.")
             return None
         # check that VjRange is at least 1 step
         elif VjRange < VjStep:
-            self.__logMessage(f"{VjLow}..{VjHigh} is smaller than one step.")
+            self.logger.error(f"CCADevice({self.band}): {VjLow}..{VjHigh} is smaller than one step.")
             return None
 
         # Sweep one or two ranges:
@@ -372,16 +373,16 @@ class CCADevice(FEMCDevice):
         while not done:
             # set and read messages:
             sequence.append(AMBMessage(
-                self.CMD_OFFSET + self.SIS_VOLTAGE + subsysOffset,
-                self.packFloat(VjSet)
+                RCA = self.CMD_OFFSET + self.SIS_VOLTAGE + subsysOffset,
+                data = self.packFloat(VjSet)
             ))
             sequence.append(AMBMessage(
-                self.SIS_VOLTAGE + subsysOffset,
-                bytes(0)
+                RCA = self.SIS_VOLTAGE + subsysOffset,
+                data = bytes(0)
             ))
             sequence.append(AMBMessage(
-                self.SIS_CURRENT + subsysOffset,
-                bytes(0)
+                RCA = self.SIS_CURRENT + subsysOffset,
+                data = bytes(0)
             ))
             
             # increment and loop end condition:
@@ -402,9 +403,9 @@ class CCADevice(FEMCDevice):
         if band == 4:
             VjMax = 6.5
         elif band in (3, 6):
-            VjMax = 12.0
+            VjMax = 20.0
         elif band in (5, 7, 8, 9, 10):
-            VjMax = 3.0
+            VjMax = 4.0
         else:
             return None
         return (-VjMax, VjMax, (2 * VjMax) / (numPoints - 1))
@@ -432,10 +433,6 @@ class CCADevice(FEMCDevice):
         if not self.hasSIS2(self.band):
             device = 1
         return (pol, device)
-    
-    def __logMessage(self, msg, alwaysLog = False):
-        if self.logInfo or alwaysLog:
-            print(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + f" CCADevice band{self.band}: {msg}")
 
     @staticmethod
     def hasSIS(band : int):

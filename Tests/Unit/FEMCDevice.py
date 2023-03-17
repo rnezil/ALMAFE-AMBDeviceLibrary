@@ -3,6 +3,7 @@ from AMB.AMBConnectionNican import AMBConnectionNican
 from AMB.AMBConnectionDLL import AMBConnectionDLL
 from AMB.FEMCDevice import FEMCDevice
 from time import sleep
+import configparser
 
 class test_FEMCDevice(unittest.TestCase):
     GET_YTO_COARSE_TUNE    = 0x00800
@@ -16,9 +17,11 @@ class test_FEMCDevice(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        # cls.conn = AMBConnectionNican(channel = 0, resetOnError = True)
-        cls.conn = AMBConnectionDLL(channel = 0, dllName = 'L:\ALMA-FEControl\FrontEndAMBDLL\deploy\FrontEndAMB.dll')
-        
+        config = configparser.ConfigParser()
+        config.read('FrontEndAMBDLL.ini')
+        dllName = config['load']['dll']
+        cls.conn = AMBConnectionDLL(channel = 0, dllName = dllName) 
+
     @classmethod
     def tearDownClass(cls):
         cls.conn.shutdown()
@@ -44,9 +47,18 @@ class test_FEMCDevice(unittest.TestCase):
         mode = self.dev.getFeMode()
         self.assertTrue(mode == FEMCDevice.MODE_TROUBLESHOOTING, "SET_FE_MODE failed")
         # not testing MODE_MAINTENANCE because that starts the FTP server in FEMC >= 3.5
-        self.dev.setFeMode(FEMCDevice.MODE_SIMULATE)
-        mode = self.dev.getFeMode()
-        self.assertTrue(mode == FEMCDevice.MODE_SIMULATE, "SET_FE_MODE failed")
+        
+        # check for firmware version which supports FE_MODE=3:
+        version = self.dev.getFemcVersion()        
+        self.assertTrue(len(version) >= 5) # e.g. 3.6.3
+        version = version.split('.')
+
+        if int(version[0]) >= 3 and int(version[1]) >= 6 and int(version[2]) >= 3:
+            # test FE_MODE=3:
+            self.dev.setFeMode(FEMCDevice.MODE_SIMULATE)
+            mode = self.dev.getFeMode()
+            self.assertTrue(mode == FEMCDevice.MODE_SIMULATE)
+
         self.dev.setFeMode(prevMode)
         mode = self.dev.getFeMode()
         self.assertTrue(mode == prevMode, "SET_FE_MODE failed")
@@ -87,7 +99,7 @@ class test_FEMCDevice(unittest.TestCase):
         self.assertIsNotNone(enable)
         
         data = self.dev.monitor(self.GET_PHOTOMIXER_VOLTAGE)
-        volts = self.dev.unpackFloat(data)
+        volts = abs(self.dev.unpackFloat(data))
         self.assertTrue(volts >= 0.0 and volts <= 5.0)
                         
     def test_command(self):

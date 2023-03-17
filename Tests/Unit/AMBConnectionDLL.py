@@ -1,7 +1,9 @@
 import unittest
 from AMB.AMBConnectionDLL import AMBConnectionDLL
+import configparser
 
 class test_AMBConnectionDLL(unittest.TestCase):
+    GET_FEMC_VERSION        = 0x20002
     GET_FE_MODE             = 0x2000E
     SET_FE_MODE             = 0x2100E
     GET_AMBSI_PROTOCOL_REV  = 0x30000
@@ -9,12 +11,15 @@ class test_AMBConnectionDLL(unittest.TestCase):
     conn = None
     
     @classmethod
-    def setUpClass(cls):        
-        cls.conn = AMBConnectionDLL(channel = 0, dllName = 'L:\ALMA-FEControl\FrontEndAMBDLL\deploy\FrontEndAMB.dll')
+    def setUp(self):        
+        config = configparser.ConfigParser()
+        config.read('FrontEndAMBDLL.ini')
+        dllName = config['load']['dll']
+        self.conn = AMBConnectionDLL(channel = 0, dllName = dllName)
         
     @classmethod
-    def tearDownClass(cls):
-        cls.conn.shutdown()
+    def tearDown(self):
+        self.conn.shutdown()
         
     def test_setTimeout(self):
         #TODO how to test?
@@ -35,10 +40,19 @@ class test_AMBConnectionDLL(unittest.TestCase):
         self.conn.command(self.FEMC_NODE_ADDR, self.SET_FE_MODE, b'\x01')
         mode = self.conn.monitor(self.FEMC_NODE_ADDR, self.GET_FE_MODE)
         self.assertTrue(mode == b'\x01', "SET_FE_MODE failed")
-        # not testing x02 because that starts the FTP server in FEMC >= 3.5
-        self.conn.command(self.FEMC_NODE_ADDR, self.SET_FE_MODE, b'\x03')
-        mode = self.conn.monitor(self.FEMC_NODE_ADDR, self.GET_FE_MODE)
-        self.assertTrue(mode == b'\x03', "SET_FE_MODE failed")
+
+        # not testing FE_MODE=2 because that starts the FTP server in FEMC >= 3.5
+                
+        # check for firmware version which supports FE_MODE=3:
+        version = self.conn.monitor(self.FEMC_NODE_ADDR, self.GET_FEMC_VERSION)
+        self.assertTrue(len(version) == 3)
+        if version[0] >= 3 and version[1] >= 6 and version[2] >= 3:
+            # test FE_MODE=3:
+            self.conn.command(self.FEMC_NODE_ADDR, self.SET_FE_MODE, b'\x03')
+            mode = self.conn.monitor(self.FEMC_NODE_ADDR, self.GET_FE_MODE)
+            self.assertTrue(mode == b'\x03', "SET_FE_MODE failed")
+
+        #restore previous mode:
         self.conn.command(self.FEMC_NODE_ADDR, self.SET_FE_MODE, prevMode)
         mode = self.conn.monitor(self.FEMC_NODE_ADDR, self.GET_FE_MODE)
         self.assertTrue(mode == prevMode, "SET_FE_MODE failed")

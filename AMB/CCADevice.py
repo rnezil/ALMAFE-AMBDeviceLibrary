@@ -150,12 +150,13 @@ class CCADevice(FEMCDevice):
                 ret[f"temp{i}"] = 0.0
         return ret
     
-    def getSIS(self, pol:int, sis:int, averaging:int = 1):
+    def getSIS(self, pol:int, sis:int, averaging:int = 1, nDigits = None):
         '''
         Read the SIS monitor data for a specific pol and sb:
         :param pol: int in 0..1
         :param sis: int in 1=SIS1, 2=SIS2.  Corresponds to sideband in some bands.
         :averaging int number of samples of Vj and Ij to average
+        :nDigits limit number of decimal places
         :return { 'Vj': float mV, 'Ij': float mA, 'Vmag': float, 'Imag': float mA, 'averaging': int }
         '''
         if not self.hasSIS(self.band):
@@ -177,17 +178,23 @@ class CCADevice(FEMCDevice):
             pass
         ret = {}
         
-        ret['Vj'] = round(sumVj / averaging, 2)  
-        ret['Ij'] = round(sumIj / averaging, 2) 
+        ret['Vj'] = sumVj / averaging
+        ret['Ij'] = sumIj / averaging
+        if nDigits is not None:
+            ret['Vj'] = round(ret['Vj'], nDigits)
+            ret['Ij'] = round(ret['Ij'], nDigits)
         try:
             ret['Vmag'] = 0
             ret['Imag'] = 0
             val = self.monitor(self.SIS_MAGNET_VOLTAGE + subsysOffset)
             if val != b'\xfe':
-                ret['Vmag'] = round(self.unpackFloat(val), 3) if val != b'xfe' else 0
+                ret['Vmag'] = self.unpackFloat(val)
             val = self.monitor(self.SIS_MAGNET_CURRENT + subsysOffset)
             if val != b'\xfe':
-                ret['Imag'] = round(self.unpackFloat(val), 3) if val != b'xFE' else 0
+                ret['Imag'] = self.unpackFloat(val)
+            if nDigits is not None:
+                ret['Vmag'] = round(ret['Vmag'], nDigits)
+                ret['Imag'] = round(ret['Imag'], nDigits)
         except AMBConnectionError:
             raise
         ret['averaging'] = averaging

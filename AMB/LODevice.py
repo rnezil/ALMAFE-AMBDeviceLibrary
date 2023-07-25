@@ -9,7 +9,7 @@ from AMB.AMBConnectionItf import AMBConnectionItf, AMBConnectionError
 from datetime import datetime
 from typing import Optional
 from time import sleep
-from .Utility.logger import getLogger
+import logging
 
 class LODevice(FEMCDevice):
 
@@ -27,10 +27,10 @@ class LODevice(FEMCDevice):
                  femcPort:Optional[int] = None): # optional override which port the band is connected to
         super(LODevice, self).__init__(conn, nodeAddr, femcPort if femcPort else band)
         self.band = band
-        self.logger = getLogger()
         self.ytoLowGHz = 0
         self.ytoHighGHz = 0
         self.freqLOGHz = 0      # cache in setLOFrequency() and optionally reuse in lockPLL()
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
     
     def setYTOLimits(self, lowGHz:float, highGHz:float):
         self.ytoLowGHz = lowGHz

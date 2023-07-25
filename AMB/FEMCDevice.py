@@ -11,7 +11,7 @@ from typing import List, Optional
 from datetime import datetime
 import struct
 from time import sleep
-from .Utility.logger import getLogger
+import logging
 
 class FEMCDevice(AMBDevice):
 
@@ -44,6 +44,7 @@ class FEMCDevice(AMBDevice):
         super(FEMCDevice, self).__init__(conn, nodeAddr)
         self.femcPort = femcPort
         self.initialized = False
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
     
     def __del__(self):
         self.shutdown() 

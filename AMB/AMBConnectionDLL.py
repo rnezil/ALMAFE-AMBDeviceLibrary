@@ -4,10 +4,10 @@ AmbConnection implemented via the C++/Windows FrontEndAMB.dll
 from typing import Optional, List
 from .AMBConnectionItf import AMBConnectionItf, AMBConnectionError, BusNode, AMBMessage
 from .Utility import DLLClose
-from .Utility.logger import getLogger
 import ctypes
 from copy import copy
 from datetime import datetime
+import logging
 
 class AMBConnectionDLL(AMBConnectionItf):
 
@@ -19,8 +19,8 @@ class AMBConnectionDLL(AMBConnectionItf):
                         Can be just 'FrontEndAMB.dll' if it is on the system path or './FrontEndAMB.dll' if it is in the current dir
         '''
         self.channel = channel
-        self.logger = getLogger()
         self.dll = ctypes.CDLL(dllName)
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
         ret = self.dll.initialize()
         if ret != 0:
             self.shutdown()

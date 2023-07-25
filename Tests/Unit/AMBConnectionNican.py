@@ -1,4 +1,5 @@
 import unittest
+import logging
 from AMB.AMBConnectionNican import AMBConnectionNican
 
 class test_AMBConnectionNican(unittest.TestCase):
@@ -14,7 +15,8 @@ class test_AMBConnectionNican(unittest.TestCase):
             self.conn = AMBConnectionNican(channel = 0, resetOnError = True)
         except:
             pass
-        
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
+
     def tearDown(self):
         self.conn.shutdown()
         

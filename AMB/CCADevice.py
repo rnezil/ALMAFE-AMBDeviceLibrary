@@ -10,7 +10,7 @@ from AMB.AMBConnectionItf import AMBConnectionItf, AMBMessage, AMBConnectionErro
 from datetime import datetime
 from typing import Optional
 from time import sleep
-from .Utility.logger import getLogger
+import logging
 
 class CCADevice(FEMCDevice):
     
@@ -21,8 +21,8 @@ class CCADevice(FEMCDevice):
                  femcPort:Optional[int] = None):  # optional override which port the band is connected to
         super(CCADevice, self).__init__(conn, nodeAddr, femcPort if femcPort else band)
         self.band = band
-        self.logger = getLogger()
-        
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
+   
     def setSIS(self, pol:int, sis:int, Vj:float = None, Imag:float = None):
         '''
         Set SIS mixer and/or magnet bias
@@ -287,11 +287,11 @@ class CCADevice(FEMCDevice):
         pol, sis = self.__checkPolAndDevice(pol, sis)
 
         if not self.hasSIS(self.band):
-            print(f"Band {self.dev.band} has no SIS.")
+            self.logger.info(f"Band {self.dev.band} has no SIS.")
             return None
 
         if sis == 2 and not self.hasSIS2(self.band):
-            print(f"Band {self.dev.band} has no SIS.")
+            self.logger.info(f"Band {self.dev.band} has no SIS.")
             return None
 
         # get and conditionally assign band-specific defaults:
@@ -324,8 +324,8 @@ class CCADevice(FEMCDevice):
 
         # store the voltage setting in effect now:
         priorState = self.getSISSettings(pol, sis)
-        subsysOffset = self.__subsysOffset(pol, sis) + self.femcPortOffset(self.femcPort)
-
+        subsysOffset = self.__subsysOffset(pol, sis)
+        
         sequence1 = []
         sequence2 = []
         result1 = []

@@ -10,7 +10,7 @@ from .AMBConnectionItf import AMBConnectionItf, AMBConnectionError, BusNode, AMB
 import can
 from datetime import datetime
 from can.interfaces.nican import NicanError
-from .Utility.logger import getLogger
+import logging
 
 class AMBConnectionNican(AMBConnectionItf):
     
@@ -25,9 +25,9 @@ class AMBConnectionNican(AMBConnectionItf):
         :param resetOnError: if True, and we get an 'already configured' error, try forcing a reset.
         '''
         self.channel = channel
-        self.logger = getLogger()
         self.bus = None
         self.receiveTimeout = self.RCV_TIMEOUT
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
         try:
             self.bus = can.ThreadSafeBus(interface = 'nican', channel = 'CAN{}'.format(channel), bitrate = 1000000)
         except (NicanError) as err:
@@ -47,7 +47,7 @@ class AMBConnectionNican(AMBConnectionItf):
             self.logger.info("Connected.")
         if not self.bus:
             raise AMBConnectionError("AMBConnectionNican initialize failed.")
-        
+
     def shutdown(self):
         '''
         Close connection

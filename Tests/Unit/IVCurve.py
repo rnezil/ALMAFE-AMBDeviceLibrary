@@ -4,6 +4,7 @@ from AMB.CCADevice import CCADevice
 from time import time, sleep
 import plotly.graph_objects as go
 import configparser
+import logging
 
 class test_IVCurve(unittest.TestCase):
 
@@ -19,6 +20,7 @@ class test_IVCurve(unittest.TestCase):
         cls.conn.shutdown()
         
     def setUp(self):
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")        
         self.dev = CCADevice(self.conn, 0x13, CCADevice.PORT_BAND6)
         self.dev.initSession()
         self.dev.setBandPower(CCADevice.PORT_BAND6, True)
@@ -32,7 +34,7 @@ class test_IVCurve(unittest.TestCase):
         start = time()
         VjSet, VjRead, IjRead = self.dev.IVCurve(0, 1)
         end = time()
-        print(f"I-V Curve took {end - start} seconds")
+        self.logger.info(f"I-V Curve took {end - start} seconds")
         
         fig = go.Figure()
         lines = dict(color='blue', width=1)

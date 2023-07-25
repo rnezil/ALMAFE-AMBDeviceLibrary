@@ -5,6 +5,7 @@ from AMB.FEMCDevice import FEMCDevice
 from AMB.CCADevice import CCADevice
 from time import sleep
 import configparser
+import logging
 
 class test_CCADevice(unittest.TestCase):
 
@@ -20,6 +21,7 @@ class test_CCADevice(unittest.TestCase):
         cls.conn.shutdown()
         
     def setUp(self):
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")        
         self.dev = CCADevice(self.conn, 0x13, FEMCDevice.PORT_BAND6)
         self.dev.initSession()
         self.dev.setBandPower(FEMCDevice.PORT_BAND6, True)
@@ -45,7 +47,7 @@ class test_CCADevice(unittest.TestCase):
         self.dev.setSISHeater(0, True)
         sleep(0.01)
         currentOn = self.dev.getSISHeaterCurrent(0)
-        print(f"SIS heater current off={currentOff} on={currentOn}")
+        self.logger.info(f"SIS heater current off={currentOff} on={currentOn}")
         self.assertGreater(currentOn, currentOff)
         self.dev.setSISHeater(0, False)
         
@@ -76,7 +78,7 @@ class test_CCADevice(unittest.TestCase):
         for val in temps.values():
             with self.subTest(val = val):
                 self.assertTrue(val > 0 or val == -1)
-        print("Temperatures: ", temps)
+        self.logger.info(f"Temperatures: {temps}")
     
     def test_getSIS(self):
         for pol in range(2):
@@ -84,10 +86,10 @@ class test_CCADevice(unittest.TestCase):
                 with self.subTest(pol = pol, sis = sis + 1):
                     sisData = self.dev.getSIS(pol, sis + 1, averaging = 1)
                     self.__checkAll(sisData)
-                    print(f"SIS pol{pol} sis{sis + 1}:", sisData)
+                    self.logger.info(f"SIS pol{pol} sis{sis + 1}: {sisData}")
                     sisData = self.dev.getSIS(pol, sis + 1, averaging = 8)
                     self.__checkAll(sisData)
-                    print(f"SIS pol{pol} sis{sis + 1}:", sisData)
+                    self.logger.info(f"SIS pol{pol} sis{sis + 1}: {sisData}")
         
     def test_getSISOpenLoop(self):
         self.dev.setSISOpenLoop(False)
@@ -103,7 +105,7 @@ class test_CCADevice(unittest.TestCase):
                 with self.subTest(pol = pol, lna = lna + 1):
                     lnaData = self.dev.getLNA(pol, lna)
                     self.__checkAll(lnaData)
-                    print(f"LNA pol{pol} lna{lna + 1}:", lnaData)
+                    self.logger.info(f"LNA pol{pol} lna{lna + 1}: {lnaData}")
     
     def test_getHeaterCurrent(self):
         current = self.dev.getSISHeaterCurrent(0)

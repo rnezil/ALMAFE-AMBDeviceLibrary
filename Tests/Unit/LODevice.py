@@ -5,6 +5,7 @@ from AMB.FEMCDevice import FEMCDevice
 from AMB.LODevice import LODevice
 from time import sleep
 import configparser
+import logging
 
 class test_LODevice(unittest.TestCase):
 
@@ -20,6 +21,7 @@ class test_LODevice(unittest.TestCase):
         cls.conn.shutdown()
         
     def setUp(self):
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")        
         self.dev = LODevice(self.conn, 0x13, FEMCDevice.PORT_BAND6)
         self.dev.initSession()
         self.dev.setBandPower(FEMCDevice.PORT_BAND6, True)
@@ -154,7 +156,7 @@ class test_LODevice(unittest.TestCase):
         self.assertTrue(yto['courseTune'] == 987)
         self.assertTrue(yto['lowGHz'] == 12.0)
         self.assertTrue(yto['highGHz'] == 15.5)
-        print("YTO: ", yto)
+        self.logger.info(f"YTO: {yto}")
         
     def test_getPLL(self):
         self.dev.setYTOLimits(13.5, 16.5)
@@ -162,22 +164,22 @@ class test_LODevice(unittest.TestCase):
         pll = self.dev.getPLL()
         self.__checkAll(pll)
         self.assertTrue(pll['courseTune'] == 1234)
-        print("PLL: ", pll)
+        self.logger.info(f"PLL: {pll}")
 
     def test_getPhotomixer(self):
         pmx = self.dev.getPhotomixer()
         self.__checkAll(pmx)
-        print("Photomixer: ", pmx)
+        self.logger.info(f"Photomixer: {pmx}")
         
     def test_getAMC(self):
         amc = self.dev.getAMC()
         self.__checkAll(amc)
-        print("AMC: ", amc)
+        self.logger.info(f"AMC: {amc}")
         
     def test_getPA(self):
         pa = self.dev.getPA()
         self.__checkAll(pa)
-        print("PA: ", pa)
+        self.logger.info(f"PA: {pa}")
 
     def __checkAll(self, state:dict):
         '''

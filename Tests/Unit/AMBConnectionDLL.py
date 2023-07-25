@@ -1,6 +1,7 @@
 import unittest
 from AMB.AMBConnectionDLL import AMBConnectionDLL
 import configparser
+import logging
 
 class test_AMBConnectionDLL(unittest.TestCase):
     GET_FEMC_VERSION        = 0x20002
@@ -11,11 +12,12 @@ class test_AMBConnectionDLL(unittest.TestCase):
     conn = None
     
     @classmethod
-    def setUp(self):        
+    def setUp(self):
         config = configparser.ConfigParser()
         config.read('FrontEndAMBDLL.ini')
         dllName = config['load']['dll']
         self.conn = AMBConnectionDLL(channel = 0, dllName = dllName)
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
         
     @classmethod
     def tearDown(self):

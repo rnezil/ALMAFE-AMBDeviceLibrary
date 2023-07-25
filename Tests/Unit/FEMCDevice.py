@@ -4,7 +4,7 @@ from AMB.AMBConnectionDLL import AMBConnectionDLL
 from AMB.FEMCDevice import FEMCDevice
 from time import sleep
 import configparser
-
+import logging
 class test_FEMCDevice(unittest.TestCase):
     GET_YTO_COARSE_TUNE    = 0x00800
     SET_YTO_COARSE_TUNE    = 0x10800
@@ -27,6 +27,7 @@ class test_FEMCDevice(unittest.TestCase):
         cls.conn.shutdown()
         
     def setUp(self):
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")        
         self.dev = FEMCDevice(self.conn, 0x13)
         self.dev.initSession(FEMCDevice.MODE_SIMULATE)
         
@@ -71,7 +72,7 @@ class test_FEMCDevice(unittest.TestCase):
     def test_getEsnString(self):
         esns = self.dev.getEsnString()
         self.assertTrue(len(esns) >= 10)
-        print(esns)
+        self.logger.info(esns)
 
     def test_setBandPower(self):
         self.dev.setAllBandsOff()

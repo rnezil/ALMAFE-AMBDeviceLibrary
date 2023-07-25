@@ -3,6 +3,7 @@ from AMB.AMBConnectionDLL import AMBConnectionDLL
 from AMB.AMBConnectionNican import AMBConnectionNican
 from AMB.AMBDevice import AMBDevice
 import configparser
+import logging
 
 class t_AMBDevice(unittest.TestCase):
     GET_FEMC_VERSION        = 0x20002
@@ -11,7 +12,7 @@ class t_AMBDevice(unittest.TestCase):
     GET_AMBSI_PROTOCOL_REV  = 0x30000
     
     def setUp(self):
-        pass
+        self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
         
     def tearDown(self):
         if self.dev:

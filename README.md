@@ -20,7 +20,7 @@ This package is a port from that LabVIEW library to Python.  They both are struc
 
 **AMBConnectionNican** implements AMBConnectionItf in terms of the [python-can](https://pypi.org/project/python-can/) package.  It presumes you have National Instruments CAN hardware and the NI-CAN driver installed on your system.
 
-**AMBConnectionDLL** also implements AMBConnectionItf and depends on NI-CAN hardware and driver.  I noticed while sweeping an I-V curve that the performance of python-can was quite poor compared to LabVIEW.  This class uses a C++ Windows DLL, [FrontEndAMBDLL](https://github.com/morganmcleod/ALMA-FEControl/tree/master/FrontEndAMBDLL) which I wrote.  The DLL is an extremely simple pass-through for most CAN messages but it adds a *runSequence()* method so that a list of CAN requests can be serviced rapid-fire with the results passed back to the Python method which called it.
+**AMBConnectionDLL** also implements AMBConnectionItf and depends on NI-CAN hardware and driver.  I noticed while sweeping an I-V curve that the performance of python-can was quite poor compared to LabVIEW.  This class uses a C++ Windows DLL, [FrontEndAMBDLL](https://github.com/morganmcleod/ALMA-FEControl/tree/master/FrontEndAMBDLL).
 
 Future: **AMBConnectionNixnet** will implement the interface for National Instruments XNET hardware.  NI stopped updating the NI-CAN driver in 2018 and stopped selling NI-CAN hardware in early 2020.  Now the only hardware available from NI is not backwards compatible with the NI-CAN drivers.  The only upside to this forced upgrade is that it will now support 64-bit applications.  NI-CAN only ever supported 32-bit.
 

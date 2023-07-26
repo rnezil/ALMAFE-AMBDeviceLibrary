@@ -6,7 +6,7 @@ FEMCDevice represents a device connected via an FEMC module.
   Implements standard FEMC module initializatiom, monitor, and control.
 '''
 from AMB.AMBDevice import AMBDevice
-from AMB.AMBConnectionItf import AMBConnectionItf, AMBConnectionError
+from AMB.AMBConnectionItf import AMBConnectionItf, AMBConnectionError, AMBMessage
 from typing import List, Optional
 from datetime import datetime
 import struct
@@ -166,6 +166,11 @@ class FEMCDevice(AMBDevice):
     def command(self, rca:int, data:bytes):
         return self.__devCommand(rca + self.femcPortOffset(self.femcPort), data)
     
+    def runSequence(self, sequence:List[AMBMessage]) -> List[AMBMessage]:
+        for msg in sequence:
+            msg.RCA += self.femcPortOffset(self.femcPort)
+        return self.conn.runSequence(self.nodeAddr, sequence)
+
     @staticmethod
     def femcPortOffset(femcPort: int):
         return (femcPort - 1) << 12

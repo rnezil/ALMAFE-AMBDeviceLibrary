@@ -341,7 +341,7 @@ class CCADevice(FEMCDevice):
         if Vj1Negative:
             endpt = 0 if zeroCrossing else VjHigh
             self.__IVCurveInnerLoop(sequence1, subsysOffset, VjLow, endpt, VjStep)
-            result1 = self.conn.runSequence(self.nodeAddr, sequence1)
+            result1 = self.runSequence(sequence1)
             if not result1:
                 return None
 
@@ -349,7 +349,7 @@ class CCADevice(FEMCDevice):
         if Vj2Positive:
             endpt = 0 if zeroCrossing else VjLow
             self.__IVCurveInnerLoop(sequence2, subsysOffset, VjHigh, endpt, -VjStep)
-            result2 = self.conn.runSequence(self.nodeAddr, sequence2)
+            result2 = self.runSequence(sequence2)
             if not result2:
                 return None
         

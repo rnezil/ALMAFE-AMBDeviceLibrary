@@ -23,7 +23,6 @@ class test_CCADevice(unittest.TestCase):
     def setUp(self):
         self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")        
         self.dev = CCADevice(self.conn, 0x13, FEMCDevice.PORT_BAND6)
-        self.dev.initSession()
         self.dev.setBandPower(FEMCDevice.PORT_BAND6, True)
         sleep(0.2)
         

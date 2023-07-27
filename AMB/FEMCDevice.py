@@ -43,29 +43,23 @@ class FEMCDevice(AMBDevice):
                  femcPort:Optional[int] = PORT_FEMC_MODULE):
         super(FEMCDevice, self).__init__(conn, nodeAddr)
         self.femcPort = femcPort
-        self.initialized = False
         self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
+        self.__initSession()
     
     def __del__(self):
         self.shutdown() 
         
-    def initSession(self, mode:Optional[int] = None) -> bool:
-        if self.initialized and mode is not None:
-            self.self.setFeMode(mode)
-            return True
-        else:
-            try:
-                data = super(FEMCDevice, self).monitor(self.GET_SETUP_INFO)
-            except AMBConnectionError:
-                self.logger.error('GET_SETUP_INFO exception')
-                return False
-            if data == b'\x00' or data == b'\x05':
-                self.initialized = True
-                if mode is not None:
-                    return self.setFeMode(mode)
-                else:
-                    return True
+    def __initSession(self) -> bool:
+        self.initialized = False
+        try:
+            data = super(FEMCDevice, self).monitor(self.GET_SETUP_INFO)
+        except AMBConnectionError:
+            self.logger.error('GET_SETUP_INFO exception')
             return False
+        if data == b'\x00' or data == b'\x05':
+            self.initialized = True
+            return True
+        return False
 
     def isConnected(self):
         return self.initialized

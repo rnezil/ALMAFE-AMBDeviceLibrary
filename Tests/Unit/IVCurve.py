@@ -22,7 +22,6 @@ class test_IVCurve(unittest.TestCase):
     def setUp(self):
         self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")        
         self.dev = CCADevice(self.conn, 0x13, CCADevice.PORT_BAND6)
-        self.dev.initSession()
         self.dev.setBandPower(CCADevice.PORT_BAND6, True)
         sleep(0.2)
         

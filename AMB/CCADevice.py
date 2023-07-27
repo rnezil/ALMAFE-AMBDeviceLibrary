@@ -8,7 +8,7 @@ from AMB.AMBConnectionDLL import AMBConnectionDLL
 from AMB.FEMCDevice import FEMCDevice
 from AMB.AMBConnectionItf import AMBConnectionItf, AMBMessage, AMBConnectionError
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict
 from time import sleep
 import logging
 
@@ -150,7 +150,7 @@ class CCADevice(FEMCDevice):
                 ret[f"temp{i}"] = 0.0
         return ret
     
-    def getSIS(self, pol:int, sis:int, averaging:int = 1, nDigits = None):
+    def getSIS(self, pol:int, sis:int, averaging:int = 1, nDigits = None) -> Dict[str, any]:
         '''
         Read the SIS monitor data for a specific pol and sb:
         :param pol: int in 0..1

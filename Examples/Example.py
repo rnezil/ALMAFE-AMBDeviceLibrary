@@ -17,8 +17,8 @@ self.logger.info(f"CCADevice in {time.time() - start} sec")
 
 # initilize the FEMC module
 start = time.time()
-dev.initSession(FEMCDevice.MODE_SIMULATE)
-self.logger.info(f"initSession in {time.time() - start} sec")
+dev.setFeMode(FEMCDevice.MODE_SIMULATE)
+self.logger.info(f"setFeMode in {time.time() - start} sec")
 # MODE_SIMULATE only supported since FEMC firmware 3.6.3 otherwise you need a real bias module connected.
 
 # since CCADevice is based on FEMCDevice, and ultimately AMBDevice, we can send requests to the FEMC module as well:

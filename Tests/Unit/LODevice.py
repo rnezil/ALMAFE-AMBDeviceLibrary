@@ -23,7 +23,6 @@ class test_LODevice(unittest.TestCase):
     def setUp(self):
         self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")        
         self.dev = LODevice(self.conn, 0x13, FEMCDevice.PORT_BAND6)
-        self.dev.initSession()
         self.dev.setBandPower(FEMCDevice.PORT_BAND6, True)
         sleep(0.2)
         

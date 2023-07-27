@@ -29,7 +29,7 @@ class test_FEMCDevice(unittest.TestCase):
     def setUp(self):
         self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")        
         self.dev = FEMCDevice(self.conn, 0x13)
-        self.dev.initSession(FEMCDevice.MODE_SIMULATE)
+        self.dev.setFeMode(FEMCDevice.MODE_SIMULATE)
         
     def tearDown(self):
         self.dev.shutdown()

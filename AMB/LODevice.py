@@ -348,7 +348,6 @@ class LODevice(FEMCDevice):
             'lowGHz': float, 
             'highGHz': float, 
             'ytoFreqGHz': float,    <-- YIG oscillator frequency
-            'loFreqGHz': float      <-- final 1st LO at mixer/downconverter
         }
         '''
         ret = {'ytoFreqGHz': 0, 'loFreqGHz': 0, 'courseTune': 0, 'lowGHz': 0, 'highGHz': 0}
@@ -358,7 +357,6 @@ class LODevice(FEMCDevice):
             ret['highGHz'] = self.ytoHighGHz 
             if self.ytoLowGHz > 0 and self.ytoHighGHz > self.ytoLowGHz:
                 ret['ytoFreqGHz'] = self.ytoLowGHz + ((ret['courseTune'] / 4095) * (self.ytoHighGHz - self.ytoLowGHz));
-                ret['loFreqGHz'] = ret['ytoFreqGHz'] * self.WARM_MULTIPLIERS[self.band] * self.COLD_MULTIPLIERS[self.band]
         except AMBConnectionError:
             pass
         return ret
@@ -366,11 +364,12 @@ class LODevice(FEMCDevice):
     def getPLL(self):
         '''
         Read all PLL monitor data:
-        :return { 'courseTune': int, 'temperature': float, 'nullPLL': bool } 
+        :return { 'loFreqGHz': float, 'courseTune': int, 'temperature': float, 'nullPLL': bool } 
                   plus everything from getLockInfo()
         '''
-        ret = {'courseTune': 0, 'temperature': 0, 'nullPLL': False}
+        ret = {'loFreqGHz':0, 'courseTune': 0, 'temperature': 0, 'nullPLL': False}
         try:
+            ret['loFreqGHz'] = self.freqLOGHz
             ret['courseTune'] = self.unpackU16(self.monitor(self.YTO_COARSE_TUNE))
             ret['temperature'] = round(self.unpackFloat(self.monitor(self.PLL_ASSEMBLY_TEMP)), 2)
             ret['nullPLL'] = self.unpackBool(self.monitor(self.PLL_NULL_LOOP_INTEGRATOR))

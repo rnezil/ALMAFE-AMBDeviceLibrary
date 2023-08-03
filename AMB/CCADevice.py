@@ -157,7 +157,7 @@ class CCADevice(FEMCDevice):
         :param sis: int in 1=SIS1, 2=SIS2.  Corresponds to sideband in some bands.
         :averaging int number of samples of Vj and Ij to average
         :nDigits limit number of decimal places
-        :return { 'Vj': float mV, 'Ij': float mA, 'Vmag': float, 'Imag': float mA, 'averaging': int }
+        :return { 'Vj': float mV, 'Ij': float uA, 'Vmag': float, 'Imag': float mA, 'averaging': int }
         '''
         if not self.hasSIS(self.band):
             return None
@@ -179,7 +179,7 @@ class CCADevice(FEMCDevice):
         ret = {}
         
         ret['Vj'] = sumVj / averaging
-        ret['Ij'] = sumIj / averaging
+        ret['Ij'] = (sumIj / averaging) * 1000
         if nDigits is not None:
             ret['Vj'] = round(ret['Vj'], nDigits)
             ret['Ij'] = round(ret['Ij'], nDigits)

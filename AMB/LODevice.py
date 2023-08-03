@@ -453,7 +453,7 @@ class LODevice(FEMCDevice):
             ret['VDB'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_B_VOLTAGE)), 2)
             ret['IDB'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_B_CURRENT)), 2)
             ret['multDCounts'] = self.unpackU8(self.monitor(self.AMC_MULTIPLIER_D_COUNTS))
-            ret['multDCurrent'] = round(self.unpackFloat(self.monitor(self.AMC_MULTIPLIER_D_CURRENT)), 4)
+            ret['multDCurrent'] = round(self.unpackFloat(self.monitor(self.AMC_MULTIPLIER_D_CURRENT)), 2)
             ret['VGE'] = round(self.unpackFloat(self.monitor(self.AMC_GATE_E_VOLTAGE)), 2)
             ret['VDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_VOLTAGE)), 2)
             ret['IDE'] = round(self.unpackFloat(self.monitor(self.AMC_DRAIN_E_CURRENT)), 2)

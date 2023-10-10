@@ -78,7 +78,7 @@ class AMBDevice():
         except AMBConnectionError:
             return 0.0
         
-    def getAmbsiSoftwareRev(self) -> str:
+    def getAmbsiLibraryRev(self) -> str:
         try:
             # we don't want to call the overridden monitor() method:
             data = AMBDevice.monitor(self, self.GET_AMBSI_SOFTWARE_REV)

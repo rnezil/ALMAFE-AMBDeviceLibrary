@@ -80,6 +80,13 @@ class FEMCDevice(AMBDevice):
         else:
             return "0.0.0"
         
+    def getAmbsiVersion(self) -> str:
+        data = self.__devMonitor(self.GET_AMBSI_VERSION_INFO)
+        if data:
+            return f"{data[0]}.{data[1]}.{data[2]}"
+        else:
+            return "0.0.0"
+        
     def isFemcVersionAtLeast(self, needVersion) -> bool:
         data = self.__devMonitor(self.GET_VERSION_INFO)
         needVersion = needVersion.split('.')

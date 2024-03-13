@@ -21,7 +21,7 @@ class AMBConnectionDLL(AMBConnectionItf):
         self.channel = channel
         self.dll = ctypes.CDLL(dllName)
         self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
-        ret = self.dll.initialize()
+        ret = self.dll.ambInitialize()
         if ret != 0:
             self.shutdown()
             raise AMBConnectionError(f"AMBConnectionDLL '{dllName}' initialize failed.")
@@ -37,7 +37,7 @@ class AMBConnectionDLL(AMBConnectionItf):
         self.logger.debug("AMBConnectionDLL shutdown...")
         try:
             if self.dll:
-                self.dll.shutdown()
+                self.dll.ambShutdown()
                 DLLClose.dlclose(self.dll._handle)
         except:
             pass

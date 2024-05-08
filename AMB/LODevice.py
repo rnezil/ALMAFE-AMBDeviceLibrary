@@ -183,8 +183,8 @@ class LODevice(FEMCDevice):
 
                 # Lock at tune_zero
                 self.setYTOCourseTune(tuneZero)
-                # Wait 10 ms to stabilize
-                sleep(0.1);
+                # Wait 200 ms to stabilize
+                sleep(0.2)
 
                 # Clear unlock detect:
                 self.clearUnlockDetect()
@@ -225,7 +225,7 @@ class LODevice(FEMCDevice):
             self.setYTOCourseTune(tryCourseTune)
             controlHistory.append(tryCourseTune)
         else:
-            self.logger.error(f"adjustPLL ERROR: got tryCourseTune={tryCourseTune}", True)
+            self.logger.error(f"adjustPLL ERROR: got tryCourseTune={tryCourseTune}")
             return None
 
         done = False
@@ -261,7 +261,7 @@ class LODevice(FEMCDevice):
     
         pll = self.getLockInfo()
         if not pll['isLocked']:
-            self.logger.error(f"adjustPLL ERROR: band {self.band} lost the lock while adjusting the PLL.", True)
+            self.logger.error(f"adjustPLL ERROR: band {self.band} lost the lock while adjusting the PLL.")
             error = True
         else:
             self.clearUnlockDetect()
@@ -281,13 +281,13 @@ class LODevice(FEMCDevice):
         if select == self.LOOPBW_DEFAULT:
             select = self.DEFAULT_LOOPBW[self.band]
         elif select not in (self.LOOPBW_NORMAL, self.LOOPBW_ALT):
-            self.logger.warning(f"Unsupported value for selectLoopBw.  Using default for band {self.band}.", True)
+            self.logger.warning(f"Unsupported value for selectLoopBw.  Using default for band {self.band}.")
             select = self.DEFAULT_LOOPBW[self.band]
         return self.command(self.CMD_OFFSET + self.PLL_LOOP_BANDWIDTH_SELECT, self.packU8(select))
 
     def selectLockSideband(self, select:int = LOCK_BELOW_REF):
         if select not in (self.LOCK_BELOW_REF, self.LOCK_ABOVE_REF):
-            self.logger.warning("Unsupported value for selectLockSideband. No change.", True)
+            self.logger.warning("Unsupported value for selectLockSideband. No change.")
             return False
         else:
             return self.command(self.CMD_OFFSET + self.PLL_LOCK_SIDEBAND_SELECT, self.packU8(select))
@@ -297,7 +297,7 @@ class LODevice(FEMCDevice):
 
     def setPABias(self, pol:int, drainControl:float = None, gateVoltage:float = None):
         if pol < 0 or pol > 1:
-            self.logger.warning("Unsupported pol for setPABias. No change.", True)
+            self.logger.warning("Unsupported pol for setPABias. No change.")
             return False
         ret = True
         offset = self.CMD_OFFSET + (self.POL1_OFFSET if pol==1 else 0)
@@ -325,7 +325,7 @@ class LODevice(FEMCDevice):
 
     def setTeledynePAConfig(self, hasTeledyne:bool, collectorP0:int = 0, collectorP1:int = 0):
         if self.band != 7:
-            self.logger.warning(f"Set Teledyne PA config is not supported for band {self.band}.", True)
+            self.logger.warning(f"Set Teledyne PA config is not supported for band {self.band}.")
             return False
         if collectorP0 < 0:
             collectorP0 = 0
@@ -397,7 +397,7 @@ class LODevice(FEMCDevice):
             info['refTP'] = round(self.unpackFloat(self.monitor(self.PLL_REF_TOTAL_POWER)), 2)
             info['IFTP'] = round(self.unpackFloat(self.monitor(self.PLL_IF_TOTAL_POWER)), 2)
             info['corrV'] = round(self.unpackFloat(self.monitor(self.PLL_CORRECTION_VOLTAGE)), 2)
-            info['isLocked'] = info['lockDetectBit'] and abs(info['refTP']) >= 0.5 and abs(info['IFTP']) >= 0.5
+            info['isLocked'] = info['lockDetectBit'] #and abs(info['refTP']) >= 0.5 and abs(info['IFTP']) >= 0.5
         except AMBConnectionError:
             pass
         return info

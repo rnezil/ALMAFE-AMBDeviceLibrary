@@ -150,7 +150,7 @@ class CCADevice(FEMCDevice):
                 ret[f"temp{i}"] = 0.0
         return ret
     
-    def getSIS(self, pol:int, sis:int, averaging:int = 1, nDigits = None) -> Dict[str, any]:
+    def getSIS(self, pol:int, sis:int, averaging:int = 1, nDigits = None, takeAbs = False) -> Dict[str, any]:
         '''
         Read the SIS monitor data for a specific pol and sb:
         :param pol: int in 0..1
@@ -180,6 +180,9 @@ class CCADevice(FEMCDevice):
         
         ret['Vj'] = sumVj / averaging
         ret['Ij'] = (sumIj / averaging) * 1000
+        if takeAbs:
+            ret['Vj'] = abs(ret['Vj'])
+            ret['Ij'] = abs(ret['Ij'])
         if nDigits is not None:
             ret['Vj'] = round(ret['Vj'], nDigits)
             ret['Ij'] = round(ret['Ij'], nDigits)

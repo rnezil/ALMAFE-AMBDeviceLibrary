@@ -9,8 +9,25 @@ from AMB.FEMCDevice import FEMCDevice
 from AMB.AMBConnectionItf import AMBConnectionItf, AMBMessage, AMBConnectionError
 from datetime import datetime
 from typing import Optional, Dict
-from time import sleep
+import time
 import logging
+from pydantic import BaseModel
+from typing import Optional
+
+class DefluxStatus(BaseModel):
+    pol: Optional[int] = None
+    step: int = 0
+    iMag: float = 0
+    temperature: float = 0
+
+    def headers(self):
+        return "Deflux: pol  step  IMag  Tmixer"
+
+    def __str__(self):
+        if self.pol is None:
+            return "Deflux: None"
+        else:
+            return f"Deflux: pol:{self.pol} step:{self.step} IMag:{round(self.iMag, 2)}, Tmixer:{round(self.temperature, 2)}"
 
 class CCADevice(FEMCDevice):
     
@@ -22,6 +39,7 @@ class CCADevice(FEMCDevice):
         super(CCADevice, self).__init__(conn, nodeAddr, femcPort if femcPort else band)
         self.band = band
         self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
+        self.defluxStatus = DefluxStatus()
    
     def setSIS(self, pol:int, sis:int, Vj:float = None, Imag:float = None):
         '''
@@ -286,6 +304,61 @@ class CCADevice(FEMCDevice):
         except AMBConnectionError:
             return 0
 
+    def mixerDeflux(self, 
+            pol: int, 
+            iMagMax: float = 40.0, 
+            iMagStep: float = 1.0, 
+            targetTemperature:float = 11.0):
+
+        stepTime = 0.95
+        self.setSIS(pol, 1, 0, 0)
+        self.setSIS(pol, 2, 0, 0)
+        temps = self.getCartridgeTemps()
+        tempStart = temps['temp2'] if pol == 0 else temps['temp5']
+
+        numSteps = int(iMagMax / iMagStep) + 1
+        iMag = 0
+        iMags = [0]
+        for i in range(1, numSteps):
+            iMag += iMagStep
+            iMags += [iMag, iMag, -iMag, -iMag]
+        iMags += reversed(iMags[:-2])
+
+        self.defluxStatus = DefluxStatus(pol = pol)
+        self.logger.info(self.defluxStatus.headers())
+
+        timeout = False
+        endTime = time.time() + 30
+        while not timeout and self.defluxStatus.step < len(iMags):
+            self.logger.info(self.defluxStatus)
+            self.setSISHeater(pol, False)
+            self.setSISHeater(pol, True)
+            temps = self.getCartridgeTemps()
+            self.defluxStatus.temperature = temps['temp2'] if pol == 0 else temps['temp5']
+            if self.defluxStatus.temperature >= targetTemperature:
+                self.defluxStatus.iMag = iMags[self.defluxStatus.step]
+                self.setSIS(pol, 1, None, self.defluxStatus.iMag)
+                self.defluxStatus.step += 1
+            else:
+                timeout = time.time() > endTime
+            time.sleep(stepTime)
+
+        self.setSIS(pol, 1, 0, 0)
+        self.setSIS(pol, 2, 0, 0)
+
+        tempFinish = tempStart + 0.2
+        done = False
+        endTime = time.time() + 60
+        while not done:
+            time.sleep(stepTime)            
+            temps = self.getCartridgeTemps()
+            self.defluxStatus.temperature = temps['temp2'] if pol == 0 else temps['temp5']
+            self.logger.info(self.defluxStatus)
+            done = self.defluxStatus.temperature <= tempFinish or time.time() > endTime
+
+        self.defluxStatus = DefluxStatus()
+        return not timeout
+
     def IVCurve(self, pol: int, sis: int, VjLow: float = None, VjHigh: float = None, VjStep: float = None):
         pol, sis = self.__checkPolAndDevice(pol, sis)
 
@@ -377,7 +450,7 @@ class CCADevice(FEMCDevice):
         # sweep to the first point:
         VjSet = Vj1
         self.command(self.CMD_OFFSET + self.SIS_VOLTAGE + subsysOffset, self.packFloat(VjSet))
-        sleep(.01)
+        time.sleep(.01)
 
         done = False
         while not done:

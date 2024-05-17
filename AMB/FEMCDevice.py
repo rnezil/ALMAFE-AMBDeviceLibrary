@@ -61,7 +61,7 @@ class FEMCDevice(AMBDevice):
             return True
         return False
 
-    def isConnected(self):
+    def isConnected(self) -> bool:
         return self.initialized
 
     def setPort(self, femcPort:int):

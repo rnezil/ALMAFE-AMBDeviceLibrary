@@ -11,6 +11,7 @@ from typing import Optional, Tuple
 
 class AMBDevice():
     
+    GET_AMBSI_FIRMWARE_REV  = 0x20000
     GET_AMBSI_PROTOCOL_REV  = 0x30000
     GET_AMBSI_ERRORS        = 0x30001
     GET_AMBSI_NUM_TRANS     = 0x30002
@@ -27,6 +28,12 @@ class AMBDevice():
         self.conn = conn
         self.nodeAddr = nodeAddr
 
+    def isConnected(self) -> bool:
+        if self.conn and self.nodeAddr and self.conn.isConnected:
+            data = self.getAmbsiFirmwareRev()
+            return data != "0.0.0"
+        return False
+
     def shutdown(self):
         self.conn = None
         self.nodeAddr = None
@@ -37,6 +44,14 @@ class AMBDevice():
     def monitor(self, RCA) -> Optional[bytes]:
         return self.conn.monitor(self.nodeAddr, RCA)
     
+    def getAmbsiFirmwareRev(self) -> str:
+        # we don't want to call the overridden monitor() method:
+        data = AMBDevice.monitor(self, self.GET_AMBSI_FIRMWARE_REV)
+        if data:
+            return f"{data[0]}.{data[1]}.{data[2]}"
+        else:
+            return "0.0.0"
+
     def getAmbsiProtocolRev(self) -> str:
         # we don't want to call the overridden monitor() method:
         data = AMBDevice.monitor(self, self.GET_AMBSI_PROTOCOL_REV)

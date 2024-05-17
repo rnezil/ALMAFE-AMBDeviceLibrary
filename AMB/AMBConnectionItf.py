@@ -33,6 +33,10 @@ class AMBConnectionItf(ABC):
     Derived classes will implement these methods in terms of CAN, DLL, socket, etc.
     """
     @abstractmethod
+    def isConnected(self) -> bool:
+        pass
+
+    @abstractmethod
     def setTimeout(self, timeoutMs):
         '''
         Override the default monitor timeout

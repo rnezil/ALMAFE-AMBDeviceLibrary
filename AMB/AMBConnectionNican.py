@@ -41,12 +41,14 @@ class AMBConnectionNican(AMBConnectionItf):
                     self.bus = None
             else:
                 self.bus = None
-        if not self.bus:
+        
+        if self.bus is None:
             self.logger.error("NO CONNECTION.")
         else:
             self.logger.info("Connected.")
-        if not self.bus:
-            raise AMBConnectionError("AMBConnectionNican initialize failed.")
+
+    def isConnected(self) -> bool:
+        return self.bus is not None   
 
     def shutdown(self):
         '''

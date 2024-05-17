@@ -18,18 +18,30 @@ class AMBConnectionDLL(AMBConnectionItf):
         :param dllName: path to the FrontEndAMB.dll.  
                         Can be just 'FrontEndAMB.dll' if it is on the system path or './FrontEndAMB.dll' if it is in the current dir
         '''
-        self.channel = channel
-        self.dll = ctypes.CDLL(dllName)
         self.logger = logging.getLogger("ALMAFE-AMBDeviceLibrary")
-        ret = self.dll.ambInitialize()
-        if ret != 0:
-            self.shutdown()
-            raise AMBConnectionError(f"AMBConnectionDLL '{dllName}' initialize failed.")
-        self.logger.debug(f"AMBConnectionDLL connected using {dllName} to channel {channel}")
-              
+        self.channel = channel
+        self.connected = False
+        try:
+            self.dll = ctypes.CDLL(dllName)            
+            self.connected = self.dll.ambInitialize() == 0
+        except:
+            pass
+
+        if self.connected:
+            self.logger.info(f"AMBConnectionDLL connected using {dllName} to channel {channel}")
+        else:
+            try:
+                self.shutdown()
+            except:
+                pass
+            self.logger.error(f"AMBConnectionDLL '{dllName}' initialize failed.")
+
     def __del__(self):
         self.shutdown()
           
+    def isConnected(self) -> bool:
+        return self.isConnected        
+
     def shutdown(self):
         '''
         Close connection

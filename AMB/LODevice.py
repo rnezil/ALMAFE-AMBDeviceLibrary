@@ -380,24 +380,24 @@ class LODevice(FEMCDevice):
     def getLockInfo(self, info = None):
         '''
         Read just the lock state info for the PLL:
-        :return { 'lockDetect': bool,     -> True if the raw lock detect voltage >= 3.0
+        :return { 'lockVoltage': float,   -> raw lock detect voltage >= 3.0
                   'unlockDetected': bool, -> latching unlock detect bit
                   'refTP': float,         -> reference total power detector voltage
                   'IFTP': float,          -> IF total power detector voltage
                   'corrV': float,         -> PLL correction voltage 
-                  'isLocked': bool }      -> True if lockDetect and abs(refTP) >= 0.5 and abs(IFTP) >= 0.5
+                  'isLocked': bool }      -> True if lockVoltage >= 3.0
         '''
-        defaults = {'lockDetectBit': False, 'unlockDetected': False, 'refTP': 0, 'IFTP': 0, 'corrV': 0, 'isLocked': False}
+        defaults = {'lockVoltage': False, 'unlockDetected': False, 'refTP': 0, 'IFTP': 0, 'corrV': 0, 'isLocked': False}
         if info is None:
             info = {}
         info = {**info, **defaults}
         try:
-            info['lockDetectBit'] = self.unpackFloat(self.monitor(self.PLL_LOCK_DETECT_VOLTAGE)) >= 3.0
+            info['lockVoltage'] = round(self.unpackFloat(self.monitor(self.PLL_LOCK_DETECT_VOLTAGE)), 1)
             info['unlockDetected'] = self.unpackBool(self.monitor(self.PLL_UNLOCK_DETECT_LATCH))
             info['refTP'] = round(self.unpackFloat(self.monitor(self.PLL_REF_TOTAL_POWER)), 2)
             info['IFTP'] = round(self.unpackFloat(self.monitor(self.PLL_IF_TOTAL_POWER)), 2)
             info['corrV'] = round(self.unpackFloat(self.monitor(self.PLL_CORRECTION_VOLTAGE)), 2)
-            info['isLocked'] = info['lockDetectBit'] #and abs(info['refTP']) >= 0.5 and abs(info['IFTP']) >= 0.5
+            info['isLocked'] = info['lockVoltage'] >= 3.0
         except AMBConnectionError:
             pass
         return info

@@ -165,6 +165,13 @@ class LODevice(FEMCDevice):
                 y0 = firstPllV['corrV']
                 x1 = lastPllV['courseTune']
                 x0 = firstPllV['courseTune']
+
+
+                # guard divide by zero:
+                if x1 == x0:
+                    self.logger.error(f"lockPLL:calculate slope would divide by zero: x0={x0} x1={x1} y0={y0} y1={y1}")
+                    return 0, 0, 0
+
                 slope = (y1 - y0) / (x1 - x0)
 
                 # If we have a decreasing slope (good)

@@ -143,7 +143,11 @@ class LODevice(FEMCDevice):
             if len(pllVList) == 1:
                 pll = pllVList[0]
                 # Lock at tune_zero
+                self.setNullLoopIntegrator(True)
+                sleep(0.1);
                 self.setYTOCourseTune(pll['courseTune'])
+                sleep(0.1);
+                self.setNullLoopIntegrator(False)
                 # Wait 10 ms to stabilize
                 sleep(0.1);
                 # Zero the CV from here:
@@ -189,9 +193,13 @@ class LODevice(FEMCDevice):
                 self.logger.info(f"lockPLL:ponts-4: tuneZero={tuneZero} x0={x0} x1={x1} y0={y0} y1={y1} slope={slope}")
 
                 # Lock at tune_zero
+                self.setNullLoopIntegrator(True)
+                sleep(0.1);
                 self.setYTOCourseTune(tuneZero)
                 # Wait 200 ms to stabilize
                 sleep(0.2)
+                self.setNullLoopIntegrator(True)
+                sleep(0.1);
 
                 # Clear unlock detect:
                 self.clearUnlockDetect()

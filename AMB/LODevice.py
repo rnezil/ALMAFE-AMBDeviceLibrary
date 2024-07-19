@@ -47,7 +47,7 @@ class LODevice(FEMCDevice):
         # YTO tuning frequency:
         ytoFreq = wcaFreq / self.WARM_MULTIPLIERS[self.band]
         ytoCourse = self.__ytoFreqToCourse(ytoFreq)
-        if ytoCourse == 0:
+        if ytoCourse < 0:
             return 0, 0, 0
         self.setYTOCourseTune(ytoCourse)
         return wcaFreq, ytoFreq, ytoCourse
@@ -59,15 +59,17 @@ class LODevice(FEMCDevice):
             courseTune = 4095
         return self.command(self.CMD_OFFSET + self.YTO_COARSE_TUNE, self.packU16(courseTune))
     
-    def __ytoFreqToCourse(self, ytoFreq:float):
+    def __ytoFreqToCourse(self, ytoFreq:float) -> int:
         if not (self.ytoHighGHz > self.ytoLowGHz):
             # avoid divide by zero
             self.logger.error("YTO limits are not valid.  Call setYTOLimits() first.")
-            return 0
+            return -1
         if ytoFreq < self.ytoLowGHz:
-            ytoFreq = self.ytoLowGHz
+            self.logger.error(f"YTO tuning out of range: requested={ytoFreq} GHz, min={self.ytoLowGHz}")
+            return -1
         elif ytoFreq > self.ytoHighGHz:
-            ytoFreq = self.ytoHighGHz
+            self.logger.error(f"YTO tuning out of range: requested={ytoFreq} GHz, max={self.ytoHighGHz}")
+            return -1
         return int((ytoFreq - self.ytoLowGHz) / (self.ytoHighGHz - self.ytoLowGHz) * 4095)
     
     def lockPLL(self, freqLOGHz:float = None):

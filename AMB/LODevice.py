@@ -129,7 +129,7 @@ class LODevice(FEMCDevice):
                 # Gather data
                 pll = self.getPLL()
                 yto = self.getYTO()
-                self.logger.info(f"lockPLL:points-3: isLocked={pll['isLocked']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
+                self.logger.info(f"lockPLL:points-3: isLocked={pll['isLocked']} lockVoltage={pll['lockVoltage']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
     
                 # Keep it if worth it
                 if pll['isLocked']:
@@ -145,18 +145,20 @@ class LODevice(FEMCDevice):
             if len(pllVList) == 1:
                 pll = pllVList[0]
                 # Lock at tune_zero
+                # Disable the PLL and reset the integrator
                 self.setNullLoopIntegrator(True)
-                sleep(0.1);
                 self.setYTOCourseTune(pll['courseTune'])
                 sleep(0.1);
                 self.setNullLoopIntegrator(False)
                 # Wait 10 ms to stabilize
-                sleep(0.1);
+                sleep(0.1)
+                # Disable the PLL and reset the integrator
+                self.setNullLoopIntegrator(False)
                 # Zero the CV from here:
                 self.adjustPLL(0.0)
                 # check if still locked:
                 pll = self.getPLL()
-                self.logger.info(f"lockPLL:points: found only one good tuning: isLocked={pll['isLocked']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
+                self.logger.info(f"lockPLL:points: found only one good tuning: isLocked={pll['isLocked']} lockVoltage={pll['lockVoltage']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
             
             # check for found no points:
             elif len(pllVList) == 0:
@@ -195,20 +197,20 @@ class LODevice(FEMCDevice):
                 self.logger.info(f"lockPLL:ponts-4: tuneZero={tuneZero} x0={x0} x1={x1} y0={y0} y1={y1} slope={slope}")
 
                 # Lock at tune_zero
+                # Disable the PLL and reset the integrator
                 self.setNullLoopIntegrator(True)
-                sleep(0.1);
                 self.setYTOCourseTune(tuneZero)
-                # Wait 200 ms to stabilize
-                sleep(0.2)
-                self.setNullLoopIntegrator(True)
-                sleep(0.1);
-
+                # Wait 100 ms to stabilize
+                sleep(0.1)
+                # Disable the PLL and reset the integrator
+                self.setNullLoopIntegrator(False)
+                
                 # Clear unlock detect:
                 self.clearUnlockDetect()
 
                 # check if still locked:
                 pll = self.getPLL()
-                self.logger.info(f"lockPLL:points: lock succeeded with: isLocked={pll['isLocked']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
+                self.logger.info(f"lockPLL:points: lock succeeded with: isLocked={pll['isLocked']} lockVoltage={pll['lockVoltage']} corrV={pll['corrV']} courseTune={pll['courseTune']}")
 
         pll = self.getLockInfo()            
         if pll['isLocked']:

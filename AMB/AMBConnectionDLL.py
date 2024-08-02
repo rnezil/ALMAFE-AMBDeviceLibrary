@@ -125,7 +125,7 @@ class AMBConnectionDLL(AMBConnectionItf):
             response = bytes(data[:dataLen.value])
             return response
         else:
-            self.logger.error(f"monitor nodeAddr={nodeAddr} RCA={RCA:X} returned {ret}")
+            self.logger.error(f"monitor nodeAddr={nodeAddr:X} RCA={RCA:X} returned {ret}")
             return None
             
     class MessageStruct(ctypes.Structure):

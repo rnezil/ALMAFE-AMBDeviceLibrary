@@ -77,18 +77,19 @@ class AMBConnection64(AMBConnectionItf):
         if not self.bus:
             return []
         msg = can.Message(arbitration_id=self.ARBITRATION_ID, is_extended_id=True, data=[])
-        self.bus.send(msg, timeout=self.SEND_TIMEOUT)
-        self.logger.debug("findNodes...")
-        nodes = []
-        while True:
-            msg = self.bus.recv(timeout=self.receiveTimeout)
-            if msg is not None:
-                address = (msg.arbitration_id >> 18) - 1
-                nodes.append(BusNode(address = address, serialNum = bytes(msg.data)))
-                self.logger.debug(f"{address:X}: {msg.data.hex().upper()}")
-            else:
-                break
-        return nodes
+        with bus_lock:
+            self.bus.send(msg, timeout=self.SEND_TIMEOUT)
+            self.logger.debug("findNodes...")
+            nodes = []
+            while True:
+                msg = self.bus.recv(timeout=self.receiveTimeout)
+                if msg is not None:
+                    address = (msg.arbitration_id >> 18) - 1
+                    nodes.append(BusNode(address = address, serialNum = bytes(msg.data)))
+                    self.logger.debug(f"{address:X}: {msg.data.hex().upper()}")
+                else:
+                    break
+            return nodes
 
     def command(self, nodeAddr:int, RCA:int, data:bytes) -> bool:
         '''
@@ -130,12 +131,13 @@ class AMBConnection64(AMBConnectionItf):
             return None
 
     def runSequence(self, nodeAddr:int, sequence:List[AMBMessage]) -> List[AMBMessage]:
-        for msg in sequence:
-            if msg.data:
-                self.command(nodeAddr, msg.RCA, msg.data)
-            else:
-                msg.data = self.monitor(nodeAddr, msg.RCA)
-        return sequence                
+        with bus_lock:
+            for msg in sequence:
+                if msg.data:
+                    self.command(nodeAddr, msg.RCA, msg.data)
+                else:
+                    msg.data = self.monitor(nodeAddr, msg.RCA)
+            return sequence                
 
     def rcaToArbId(self, nodeAddr, RCA):
         return ((nodeAddr + 1) << 18) + RCA

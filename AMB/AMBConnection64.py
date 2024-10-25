@@ -11,6 +11,9 @@ import can
 from can.interfaces.serial.serial_can import SerialBus
 from datetime import datetime
 import logging
+from threading import Lock
+
+bus_lock = Lock()
 
 class AMBConnection64(AMBConnectionItf):
     
@@ -98,7 +101,8 @@ class AMBConnection64(AMBConnectionItf):
         if not self.bus:
             return False
         msg = can.Message(arbitration_id=self.rcaToArbId(nodeAddr, RCA), is_extended_id=True, data=data)
-        self.bus.send(msg, timeout=self.SEND_TIMEOUT)
+        with bus_lock:
+            self.bus.send(msg, timeout=self.SEND_TIMEOUT)
         return True
         
     def monitor(self, nodeAddr:int, RCA:int) -> Optional[bytes]:
@@ -116,8 +120,9 @@ class AMBConnection64(AMBConnectionItf):
             if msg is None:
                 break
         msg = can.Message(arbitration_id=self.rcaToArbId(nodeAddr, RCA), is_extended_id=True, data=b'')
-        self.bus.send(msg, timeout = self.SEND_TIMEOUT)
-        msg = self.bus.recv(timeout = self.receiveTimeout)
+        with bus_lock:
+            self.bus.send(msg, timeout = self.SEND_TIMEOUT)
+            msg = self.bus.recv(timeout = self.receiveTimeout)
         if msg is not None:
             return bytes(msg.data)
         else:
